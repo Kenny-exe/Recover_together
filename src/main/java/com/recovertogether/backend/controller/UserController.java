@@ -2,6 +2,7 @@ package com.recovertogether.backend.controller;
 import java.util.List;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.repository.UserRepository;
+import com.recovertogether.backend.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -13,16 +14,18 @@ import org.springframework.web.server.ResponseStatusException;
 public class UserController {
 
     private final UserRepository userRepository;
+    private final UserService userService;
 
-    public UserController(UserRepository userRepository) {
+    public UserController(UserRepository userRepository, UserService userService) {
         this.userRepository = userRepository;
+        this.userService = userService;
     }
 
     //CREATE
     @PostMapping("/register")
     public User register(@Valid @RequestBody User user) {
 
-        return userRepository.save(user);
+        return userService.register(user);
     }
 
     //READ
@@ -42,13 +45,15 @@ public class UserController {
     @DeleteMapping("/{id}")
     public String deleteUser(@PathVariable Long id)
     {
-        userRepository.deleteById(id);
+        User user=userRepository.findById(id).orElseThrow(()->
+                new ResponseStatusException(HttpStatus.NOT_FOUND,"User not found"));
+        userRepository.delete(user);
         return "User deleted successfully";
     }
 
     //UPDATE
     @PutMapping("/{id}")
-    public User updateUser(@PathVariable Long id, @RequestBody User updatedUser)
+    public User updateUser(@PathVariable Long id, @Valid @RequestBody User updatedUser)
     {
         User existingUser = userRepository.findById(id).orElseThrow(()->
                 new ResponseStatusException(HttpStatus.NOT_FOUND,"User not found"));
