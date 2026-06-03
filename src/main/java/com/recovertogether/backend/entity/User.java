@@ -15,15 +15,17 @@ public class User {
     private Long id;
 
     @NotBlank(message = "Name is required")
+    @Column(nullable = false)
     private String name;
 
     @Email(message = "Invalid email format")
     @NotBlank(message = "Email is required")
-    @Column(unique = true)
+    @Column(unique = true, nullable = false)
     private String email;
 
     @NotBlank(message = "Password is required")
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    @Column(nullable = false)
     private String password;
 
     private LocalDateTime createdAt;
