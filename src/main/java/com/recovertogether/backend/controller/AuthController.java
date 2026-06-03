@@ -1,5 +1,6 @@
 package com.recovertogether.backend.controller;
 
+import com.recovertogether.backend.dto.LoginResponse;
 import com.recovertogether.backend.dto.LoginRequest;
 import com.recovertogether.backend.service.JwtService;
 import com.recovertogether.backend.service.UserService;
@@ -21,9 +22,17 @@ public class AuthController
     }
 
     @PostMapping("/login")
-    public String login(@Valid @RequestBody LoginRequest request)
+    public LoginResponse login(@Valid @RequestBody LoginRequest request)
     {
         userService.login(request.getEmail(),request.getPassword());
-        return jwtService.generateToken(request.getEmail());
+        String token=jwtService.generateToken(request.getEmail());
+        return new LoginResponse(token);
+    }
+
+    @GetMapping("/test")
+    public String testToken(
+            @RequestParam String token)
+    {
+        return jwtService.extractEmail(token);
     }
 }
