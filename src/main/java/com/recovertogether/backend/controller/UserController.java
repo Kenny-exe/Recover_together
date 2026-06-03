@@ -2,9 +2,11 @@ package com.recovertogether.backend.controller;
 import java.util.List;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.repository.UserRepository;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+
 
 @RestController
 @RequestMapping("/users")
@@ -18,11 +20,9 @@ public class UserController {
 
     //CREATE
     @PostMapping("/register")
-    public String register(@RequestBody User user) {
+    public User register(@Valid @RequestBody User user) {
 
-        userRepository.save(user);
-
-        return "User Registered";
+        return userRepository.save(user);
     }
 
     //READ
