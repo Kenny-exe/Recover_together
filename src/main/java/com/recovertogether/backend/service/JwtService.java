@@ -12,9 +12,12 @@ import java.util.Date;
 @Service
 public class JwtService
 {
-    private static final long EXPIRATION_TIME = 1000 * 60 * 60;
+
     @Value("${jwt.secret}")
     private String secret;
+
+    @Value("${jwt.expiration}")
+    private long expirationtime;
 
     private SecretKey getSigningKey()
     {
@@ -25,7 +28,7 @@ public class JwtService
     {
         return Jwts.builder().subject(email).
                 issuedAt(new Date()).
-                expiration(new Date(System.currentTimeMillis()+EXPIRATION_TIME)).
+                expiration(new Date(System.currentTimeMillis()+expirationtime)).
                 signWith(getSigningKey()).compact();
     }
 
@@ -51,6 +54,7 @@ public class JwtService
             return true;
         }catch(Exception e)
         {
+            e.printStackTrace();
             return false;
         }
     }

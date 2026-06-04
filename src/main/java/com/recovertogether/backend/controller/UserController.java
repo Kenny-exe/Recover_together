@@ -2,11 +2,15 @@ package com.recovertogether.backend.controller;
 import java.util.List;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.repository.UserRepository;
+import com.recovertogether.backend.dto.UserResponse;
 import com.recovertogether.backend.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.recovertogether.backend.entity.User;
 
 
 @RestController
@@ -62,5 +66,12 @@ public class UserController
         existingUser.setEmail(updatedUser.getEmail());
 
         return userRepository.save(existingUser);
+    }
+
+    @GetMapping("/me")
+    public UserResponse getCurrentUser()
+    {
+        User user=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return new UserResponse(user);
     }
 }
