@@ -1,6 +1,7 @@
 package com.recovertogether.backend.service;
 
 import com.recovertogether.backend.dto.PartnerRequestResponse;
+import com.recovertogether.backend.dto.SentRequestResponse;
 import com.recovertogether.backend.entity.PartnerRequest;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.enums.PartnerRequestStatus;
@@ -50,6 +51,12 @@ public class PartnerRequestService
             || partnerRequestRepository.existsBySenderAndReceiverAndStatus(receiver,sender,PartnerRequestStatus.PENDING))
         {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Request already exists");
+        }
+
+        if(partnerRequestRepository.existsBySenderAndReceiverAndStatus(sender, receiver, PartnerRequestStatus.ACCEPTED)
+            || partnerRequestRepository.existsBySenderAndReceiverAndStatus(receiver, sender, PartnerRequestStatus.ACCEPTED))
+        {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Users are already partners");
         }
 
 
@@ -125,5 +132,23 @@ public class PartnerRequestService
                 stream().
                 map(PartnerRequestResponse::new).
                 toList();
+    }
+
+    public List<SentRequestResponse> getSentRequests()
+    {
+        User currentUser=
+                (User) SecurityContextHolder
+                        .getContext()
+                        .getAuthentication()
+                        .getPrincipal();
+
+        return partnerRequestRepository
+                .findBySenderAndStatus(
+                        currentUser,
+                        PartnerRequestStatus.PENDING
+                )
+                .stream()
+                .map(SentRequestResponse::new)
+                .toList();
     }
 }
