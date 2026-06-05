@@ -4,6 +4,7 @@ import com.recovertogether.backend.dto.PartnerRequestResponse;
 import com.recovertogether.backend.dto.SentRequestResponse;
 import com.recovertogether.backend.service.PartnerRequestService;
 import org.springframework.web.bind.annotation.*;
+import com.recovertogether.backend.dto.PartnerResponse;
 
 import java.util.List;
 
@@ -49,5 +50,11 @@ public class PartnerRequestController
     public List<SentRequestResponse> getSentRequests()
     {
         return partnerRequestService.getSentRequests();
+    }
+
+    @GetMapping("/current")
+    public PartnerResponse getCurrentPartner()
+    {
+        return partnerRequestService.getCurrentPartner();
     }
 }

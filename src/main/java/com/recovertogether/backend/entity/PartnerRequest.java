@@ -23,8 +23,10 @@ public class PartnerRequest
     private User receiver;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private PartnerRequestStatus status;
 
+    @Column(nullable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

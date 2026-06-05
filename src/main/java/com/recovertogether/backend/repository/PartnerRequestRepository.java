@@ -11,7 +11,7 @@ public interface PartnerRequestRepository extends  JpaRepository<PartnerRequest,
 {
     List<PartnerRequest> findByReceiver(User receiver);
     List<PartnerRequest> findBySender(User sender);
-    Optional<PartnerRequest> findById(Long id);
+
     boolean existsBySenderAndReceiverAndStatus(
             User sender,
             User receiver,
@@ -21,7 +21,14 @@ public interface PartnerRequestRepository extends  JpaRepository<PartnerRequest,
             PartnerRequestStatus status);
     List<PartnerRequest> findBySenderAndStatus(
             User sender,
-            PartnerRequestStatus status
-    );
+            PartnerRequestStatus status);
+
+    Optional<PartnerRequest> findFirstBySenderAndStatus(
+            User sender,
+            PartnerRequestStatus status);
+
+    Optional<PartnerRequest> findFirstByReceiverAndStatus(
+            User receiver,
+            PartnerRequestStatus status);
 
 }

@@ -1,6 +1,7 @@
 package com.recovertogether.backend.service;
 
 import com.recovertogether.backend.dto.PartnerRequestResponse;
+import com.recovertogether.backend.dto.PartnerResponse;
 import com.recovertogether.backend.dto.SentRequestResponse;
 import com.recovertogether.backend.entity.PartnerRequest;
 import com.recovertogether.backend.entity.User;
@@ -109,15 +110,17 @@ public class PartnerRequestService
         PartnerRequest request=partnerRequestRepository.findById(requestId).orElseThrow(()->
                 new ResponseStatusException(HttpStatus.NOT_FOUND,"Request not found"));
 
-        System.out.println("CURRENT USER ID: " + currentUser.getId());
-        System.out.println("RECEIVER ID: " + request.getReceiver().getId());
-        System.out.println("SENDER ID: " + request.getSender().getId());
-
         if(!request.getReceiver().getId().equals(currentUser.getId()))
         {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,"You cannot reject this request");
         }
-
+        if(request.getStatus() != PartnerRequestStatus.PENDING)
+        {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Request already processed"
+            );
+        }
         request.setStatus(PartnerRequestStatus.REJECTED);
         partnerRequestRepository.save(request);
 
@@ -150,5 +153,27 @@ public class PartnerRequestService
                 .stream()
                 .map(SentRequestResponse::new)
                 .toList();
+    }
+
+    public PartnerResponse getCurrentPartner()
+    {
+        User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        PartnerRequest request=partnerRequestRepository.findFirstBySenderAndStatus(currentUser,
+                        PartnerRequestStatus.ACCEPTED).orElseGet(()->
+                partnerRequestRepository.findFirstByReceiverAndStatus(currentUser,PartnerRequestStatus.ACCEPTED).
+                        orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"No partner found")));
+
+        User partner;
+
+        if(request.getSender().getId().equals(currentUser.getId()))
+        {
+            partner=request.getReceiver();
+        }
+        else
+        {
+            partner=request.getSender();
+        }
+        return new PartnerResponse(partner);
     }
 }
