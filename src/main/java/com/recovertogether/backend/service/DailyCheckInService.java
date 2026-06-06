@@ -57,36 +57,36 @@ public class DailyCheckInService
 
     public CheckInResponse getLatestCheckIn()
     {
-        User currenrUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        DailyCheckIn checkIn= dailyCheckInRepository.findTopByUserOrderByDateDesc(currenrUser).orElseThrow(()->
+        DailyCheckIn checkIn= dailyCheckInRepository.findTopByUserOrderByDateDesc(currentUser).orElseThrow(()->
                 new ResponseStatusException(HttpStatus.NOT_FOUND,"No check-ins found"));
 
         return new CheckInResponse(checkIn);
     }
 
-    public StreakResponse getStreak()
-    {
-        User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        List<DailyCheckIn> checkIns=dailyCheckInRepository.findByUserOrderByDateAsc(currentUser);
+    public StreakResponse calculateStreak(User user)
+    {
+        List<DailyCheckIn> checkIns =
+                dailyCheckInRepository.findByUserOrderByDateAsc(user);
 
         if(checkIns.isEmpty())
         {
             return new StreakResponse(0,0);
         }
 
-        int currentRun=0;
-        int bestStreak=0;
-        LocalDate previousDate=null;
+        int currentRun = 0;
+        int bestStreak = 0;
+        LocalDate previousDate = null;
 
-        for(DailyCheckIn checkIn:checkIns)
+        for(DailyCheckIn checkIn : checkIns)
         {
-            if(checkIn.getStatus()==CheckInStatus.SUCCESS)
+            if(checkIn.getStatus() == CheckInStatus.SUCCESS)
             {
-                if(previousDate==null)
+                if(previousDate == null)
                 {
-                    currentRun=1;
+                    currentRun = 1;
                 }
                 else if(previousDate.plusDays(1).equals(checkIn.getDate()))
                 {
@@ -94,34 +94,36 @@ public class DailyCheckInService
                 }
                 else
                 {
-                    currentRun=1;
+                    currentRun = 1;
                 }
 
-                bestStreak=Math.max(bestStreak,currentRun);
-                previousDate=checkIn.getDate();
+                bestStreak = Math.max(bestStreak,currentRun);
+                previousDate = checkIn.getDate();
             }
             else
             {
-                currentRun=0;
-                previousDate=null;
+                currentRun = 0;
+                previousDate = null;
             }
         }
 
-        int currentStreak=0;
+        int currentStreak = 0;
 
-        for(int i=checkIns.size()-1;i>=0;i--)
+        for(int i = checkIns.size()-1; i >= 0; i--)
         {
             DailyCheckIn checkIn = checkIns.get(i);
 
-            if(checkIn.getStatus()==CheckInStatus.SUCCESS)
+            if(checkIn.getStatus() == CheckInStatus.SUCCESS)
             {
-                if(currentStreak==0)
+                if(currentStreak == 0)
                 {
-                    currentStreak=1;
+                    currentStreak = 1;
                 }
                 else
                 {
-                    LocalDate currentDate = checkIns.get(i+1).getDate();
+                    LocalDate currentDate =
+                            checkIns.get(i+1).getDate();
+
                     if(checkIn.getDate().plusDays(1).equals(currentDate))
                     {
                         currentStreak++;
@@ -137,7 +139,23 @@ public class DailyCheckInService
                 break;
             }
         }
-        return new StreakResponse(currentStreak,bestStreak);
+
+        return new StreakResponse(
+                currentStreak,
+                bestStreak
+        );
+    }
+
+
+    public StreakResponse getStreak()
+    {
+        User currentUser =
+                (User) SecurityContextHolder
+                        .getContext()
+                        .getAuthentication()
+                        .getPrincipal();
+
+        return calculateStreak(currentUser);
     }
 
     public CheckInStatsResponse getStats()
@@ -152,7 +170,7 @@ public class DailyCheckInService
 
         if(totalCheckIns>0)
         {
-            successRate=(double) (successCount/totalCheckIns)*100;
+            successRate=((double) successCount/totalCheckIns)*100;
         }
 
         StreakResponse streak = getStreak();

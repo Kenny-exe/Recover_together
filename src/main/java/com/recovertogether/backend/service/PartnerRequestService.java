@@ -10,8 +10,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import com.recovertogether.backend.entity.DailyCheckIn;
-import com.recovertogether.backend.enums.CheckInStatus;
 import com.recovertogether.backend.repository.DailyCheckInRepository;
 
 import java.util.List;
@@ -21,16 +19,17 @@ public class PartnerRequestService
 {
     public PartnerRequestService(
             PartnerRequestRepository partnerRequestRepository,
-            UserRepository userRepository, DailyCheckInRepository dailyCheckInRepository)
-        {
-            this.partnerRequestRepository = partnerRequestRepository;
-            this.userRepository = userRepository;
-            this.dailyCheckInRepository = dailyCheckInRepository;
-        }
+            UserRepository userRepository, DailyCheckInService dailyCheckInService)
+            {
+                this.partnerRequestRepository = partnerRequestRepository;
+                this.userRepository = userRepository;
+                this.dailyCheckInService = dailyCheckInService;
+            }
 
     private final PartnerRequestRepository partnerRequestRepository;
     private final UserRepository userRepository;
-    private final DailyCheckInRepository dailyCheckInRepository;
+    private final DailyCheckInService dailyCheckInService;
+
     public void sendRequest(Long receiverId)
     {
 
@@ -171,13 +170,15 @@ public class PartnerRequestService
         PartnerResponse partner = getCurrentPartner();
         User partnerUser=userRepository.findByEmail(partner.getEmail()).orElseThrow();
 
-        StreakResponse streak=calculateStreak(partnerUser);
+        StreakResponse streak =
+                dailyCheckInService.calculateStreak(partnerUser);
 
         return new PartnerSummaryResponse(
                 partner.getName(),
                 partner.getEmail(),
                 streak.getCurrentStreak(),
-                streak.getBestStreak());
+                streak.getBestStreak()
+        );
     }
 
     public void unpair()
@@ -192,86 +193,5 @@ public class PartnerRequestService
                         );
 
         partnerRequestRepository.delete(request);
-    }
-
-    private StreakResponse calculateStreak(User user)
-    {
-        List<DailyCheckIn> checkIns =
-                dailyCheckInRepository.findByUserOrderByDateAsc(user);
-
-        if(checkIns.isEmpty())
-        {
-            return new StreakResponse(0,0);
-        }
-
-        int currentRun = 0;
-        int bestStreak = 0;
-
-        java.time.LocalDate previousDate = null;
-
-        for(DailyCheckIn checkIn : checkIns)
-        {
-            if(checkIn.getStatus() == CheckInStatus.SUCCESS)
-            {
-                if(previousDate == null)
-                {
-                    currentRun = 1;
-                }
-                else if(previousDate.plusDays(1).equals(checkIn.getDate()))
-                {
-                    currentRun++;
-                }
-                else
-                {
-                    currentRun = 1;
-                }
-
-                bestStreak = Math.max(bestStreak,currentRun);
-                previousDate = checkIn.getDate();
-            }
-            else
-            {
-                currentRun = 0;
-                previousDate = null;
-            }
-        }
-
-        int currentStreak = 0;
-
-        for(int i = checkIns.size()-1; i >= 0; i--)
-        {
-            DailyCheckIn checkIn = checkIns.get(i);
-
-            if(checkIn.getStatus() == CheckInStatus.SUCCESS)
-            {
-                if(currentStreak == 0)
-                {
-                    currentStreak = 1;
-                }
-                else
-                {
-                    java.time.LocalDate currentDate =
-                            checkIns.get(i+1).getDate();
-
-                    if(checkIn.getDate().plusDays(1).equals(currentDate))
-                    {
-                        currentStreak++;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                break;
-            }
-        }
-
-        return new StreakResponse(
-                currentStreak,
-                bestStreak
-        );
     }
 }

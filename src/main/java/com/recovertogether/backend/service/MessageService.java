@@ -56,6 +56,12 @@ public class MessageService
         Message message=new Message();
 
         content = content.trim();
+
+        if(content.trim().isEmpty())
+        {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Message cannot be empty");
+        }
+
         message.setSender(sender);
         message.setReceiver(receiver);
         message.setContent(content);
