@@ -36,6 +36,11 @@ public class MessageService
         User receiver=userRepository.findById(receiverId).orElseThrow(()->
                 new ResponseStatusException(HttpStatus.NOT_FOUND,"User not found"));
 
+        if(sender.getId().equals(receiverId))
+        {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"You cannot message yourself");
+        }
+
         boolean arePartners=partnerRequestRepository.
                 existsBySenderAndReceiverAndStatus(sender,receiver,PartnerRequestStatus.ACCEPTED)
                 ||
@@ -47,12 +52,14 @@ public class MessageService
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,"You can only message your partner");
         }
 
+
         Message message=new Message();
 
+        content = content.trim();
         message.setSender(sender);
         message.setReceiver(receiver);
         message.setContent(content);
-        content = content.trim();
+
         messageRepository.save(message);
     }
     public List<ChatMessageResponse> getConversation(Long partnerId)

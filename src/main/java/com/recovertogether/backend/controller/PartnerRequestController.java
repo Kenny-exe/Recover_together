@@ -61,4 +61,10 @@ public class PartnerRequestController
     {
         return partnerRequestService.getPartnerSummary();
     }
+
+    @PostMapping("/unpair")
+    public MessageResponse unpair()
+    {
+        partnerRequestService.unpair(); return new MessageResponse("Partnership ended");
+    }
 }

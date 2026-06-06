@@ -1,9 +1,6 @@
 package com.recovertogether.backend.service;
 
-import com.recovertogether.backend.dto.PartnerRequestResponse;
-import com.recovertogether.backend.dto.PartnerResponse;
-import com.recovertogether.backend.dto.PartnerSummaryResponse;
-import com.recovertogether.backend.dto.SentRequestResponse;
+import com.recovertogether.backend.dto.*;
 import com.recovertogether.backend.entity.PartnerRequest;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.enums.PartnerRequestStatus;
@@ -13,24 +10,27 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import com.recovertogether.backend.entity.DailyCheckIn;
+import com.recovertogether.backend.enums.CheckInStatus;
+import com.recovertogether.backend.repository.DailyCheckInRepository;
 
 import java.util.List;
-
 
 @Service
 public class PartnerRequestService
 {
     public PartnerRequestService(
             PartnerRequestRepository partnerRequestRepository,
-            UserRepository userRepository)
+            UserRepository userRepository, DailyCheckInRepository dailyCheckInRepository)
         {
             this.partnerRequestRepository = partnerRequestRepository;
             this.userRepository = userRepository;
+            this.dailyCheckInRepository = dailyCheckInRepository;
         }
 
     private final PartnerRequestRepository partnerRequestRepository;
     private final UserRepository userRepository;
-
+    private final DailyCheckInRepository dailyCheckInRepository;
     public void sendRequest(Long receiverId)
     {
 
@@ -78,9 +78,6 @@ public class PartnerRequestService
 
         PartnerRequest request=partnerRequestRepository.findById(requestId).orElseThrow(()
                 ->new ResponseStatusException(HttpStatus.NOT_FOUND,"Request not found"));
-
-        System.out.println("REQUEST STATUS: "
-                + request.getStatus());
 
         if(!request.getReceiver().getId().equals(currentUser.getId()))
         {
@@ -172,12 +169,109 @@ public class PartnerRequestService
     public PartnerSummaryResponse getPartnerSummary()
     {
         PartnerResponse partner = getCurrentPartner();
+        User partnerUser=userRepository.findByEmail(partner.getEmail()).orElseThrow();
+
+        StreakResponse streak=calculateStreak(partnerUser);
 
         return new PartnerSummaryResponse(
                 partner.getName(),
                 partner.getEmail(),
-                0,
-                0
+                streak.getCurrentStreak(),
+                streak.getBestStreak());
+    }
+
+    public void unpair()
+    {
+        User currentUser =
+                (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        PartnerRequest request =
+                partnerRequestRepository.findFirstBySenderAndStatus(currentUser, PartnerRequestStatus.ACCEPTED)
+                        .orElseGet(() -> partnerRequestRepository.findFirstByReceiverAndStatus(currentUser, PartnerRequestStatus.ACCEPTED)
+                                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No partner found"))
+                        );
+
+        partnerRequestRepository.delete(request);
+    }
+
+    private StreakResponse calculateStreak(User user)
+    {
+        List<DailyCheckIn> checkIns =
+                dailyCheckInRepository.findByUserOrderByDateAsc(user);
+
+        if(checkIns.isEmpty())
+        {
+            return new StreakResponse(0,0);
+        }
+
+        int currentRun = 0;
+        int bestStreak = 0;
+
+        java.time.LocalDate previousDate = null;
+
+        for(DailyCheckIn checkIn : checkIns)
+        {
+            if(checkIn.getStatus() == CheckInStatus.SUCCESS)
+            {
+                if(previousDate == null)
+                {
+                    currentRun = 1;
+                }
+                else if(previousDate.plusDays(1).equals(checkIn.getDate()))
+                {
+                    currentRun++;
+                }
+                else
+                {
+                    currentRun = 1;
+                }
+
+                bestStreak = Math.max(bestStreak,currentRun);
+                previousDate = checkIn.getDate();
+            }
+            else
+            {
+                currentRun = 0;
+                previousDate = null;
+            }
+        }
+
+        int currentStreak = 0;
+
+        for(int i = checkIns.size()-1; i >= 0; i--)
+        {
+            DailyCheckIn checkIn = checkIns.get(i);
+
+            if(checkIn.getStatus() == CheckInStatus.SUCCESS)
+            {
+                if(currentStreak == 0)
+                {
+                    currentStreak = 1;
+                }
+                else
+                {
+                    java.time.LocalDate currentDate =
+                            checkIns.get(i+1).getDate();
+
+                    if(checkIn.getDate().plusDays(1).equals(currentDate))
+                    {
+                        currentStreak++;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        return new StreakResponse(
+                currentStreak,
+                bestStreak
         );
     }
 }
