@@ -1,10 +1,8 @@
 package com.recovertogether.backend.controller;
-import com.recovertogether.backend.dto.MessageResponse;
-import com.recovertogether.backend.dto.PartnerRequestResponse;
-import com.recovertogether.backend.dto.SentRequestResponse;
+import com.recovertogether.backend.dto.*;
 import com.recovertogether.backend.service.PartnerRequestService;
 import org.springframework.web.bind.annotation.*;
-import com.recovertogether.backend.dto.PartnerResponse;
+
 
 import java.util.List;
 
@@ -56,5 +54,11 @@ public class PartnerRequestController
     public PartnerResponse getCurrentPartner()
     {
         return partnerRequestService.getCurrentPartner();
+    }
+
+    @GetMapping("/summary")
+    public PartnerSummaryResponse getPartnerSummary()
+    {
+        return partnerRequestService.getPartnerSummary();
     }
 }

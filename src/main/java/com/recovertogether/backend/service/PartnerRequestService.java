@@ -2,6 +2,7 @@ package com.recovertogether.backend.service;
 
 import com.recovertogether.backend.dto.PartnerRequestResponse;
 import com.recovertogether.backend.dto.PartnerResponse;
+import com.recovertogether.backend.dto.PartnerSummaryResponse;
 import com.recovertogether.backend.dto.SentRequestResponse;
 import com.recovertogether.backend.entity.PartnerRequest;
 import com.recovertogether.backend.entity.User;
@@ -78,14 +79,6 @@ public class PartnerRequestService
         PartnerRequest request=partnerRequestRepository.findById(requestId).orElseThrow(()
                 ->new ResponseStatusException(HttpStatus.NOT_FOUND,"Request not found"));
 
-        System.out.println("CURRENT USER ID: " + currentUser.getId());
-
-        System.out.println("REQUEST RECEIVER ID: "
-                + request.getReceiver().getId());
-
-        System.out.println("REQUEST SENDER ID: "
-                + request.getSender().getId());
-
         System.out.println("REQUEST STATUS: "
                 + request.getStatus());
 
@@ -159,11 +152,10 @@ public class PartnerRequestService
     {
         User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        PartnerRequest request=partnerRequestRepository.findFirstBySenderAndStatus(currentUser,
-                        PartnerRequestStatus.ACCEPTED).orElseGet(()->
-                partnerRequestRepository.findFirstByReceiverAndStatus(currentUser,PartnerRequestStatus.ACCEPTED).
-                        orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"No partner found")));
-
+        PartnerRequest request=partnerRequestRepository.findFirstBySenderAndStatus(currentUser,PartnerRequestStatus.ACCEPTED).
+                orElseGet(()->
+                        partnerRequestRepository.findFirstByReceiverAndStatus(currentUser,PartnerRequestStatus.ACCEPTED).
+                                orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"No partner found")));
         User partner;
 
         if(request.getSender().getId().equals(currentUser.getId()))
@@ -175,5 +167,17 @@ public class PartnerRequestService
             partner=request.getSender();
         }
         return new PartnerResponse(partner);
+    }
+
+    public PartnerSummaryResponse getPartnerSummary()
+    {
+        PartnerResponse partner = getCurrentPartner();
+
+        return new PartnerSummaryResponse(
+                partner.getName(),
+                partner.getEmail(),
+                0,
+                0
+        );
     }
 }

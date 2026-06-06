@@ -2,6 +2,7 @@ package com.recovertogether.backend.repository;
 
 import com.recovertogether.backend.entity.DailyCheckIn;
 import com.recovertogether.backend.entity.User;
+import com.recovertogether.backend.enums.CheckInStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
@@ -11,5 +12,12 @@ import java.util.Optional;
 public interface DailyCheckInRepository extends JpaRepository<DailyCheckIn,Long>
 {
     List<DailyCheckIn> findByUser(User user);
+    List<DailyCheckIn> findByUserOrderByDateDesc(User user);
     Optional<DailyCheckIn> findByUserAndDate(User user, LocalDate date);
+    Optional<DailyCheckIn> findTopByUserOrderByDateDesc(User user);
+    List<DailyCheckIn> findByUserOrderByDateAsc(User user);
+
+    long countByUser(User user);
+    long countByUserAndStatus(User user, CheckInStatus status);
+
 }

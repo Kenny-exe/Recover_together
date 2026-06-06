@@ -31,7 +31,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
 
         String path = request.getServletPath();
-        if (path.equals("/auth/login") || path.equals("/users/register")) {
+        if (path.startsWith("/auth"))
+        {
             filterChain.doFilter(request, response);
             return;
         }
@@ -40,38 +41,63 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write(
+                    "{\"message\":\"Invalid or expired token\"}"
+            );
             return;
         }
 
         String token = authHeader.substring(7);
 
-        if (jwtService.validateToken(token)) {
-            String email = jwtService.extractEmail(token);
-
-            User user= userRepository.findByEmail(email).orElse(null);
-
-            if(user == null)
+        try
+        {
+            if (jwtService.validateToken(token))
             {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                return;
-            }
+                String email = jwtService.extractEmail(token);
 
-            UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(
-                            user,
-                            null,
-                            java.util.Collections.emptyList()
+                User user= userRepository.findByEmail(email).orElse(null);
+
+                if(user == null)
+                {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write(
+                            "{\"message\":\"User not found\"}"
                     );
+                    return;
+                }
 
-            SecurityContextHolder
-                    .getContext()
-                    .setAuthentication(auth);
-        }
-        else
+                UsernamePasswordAuthenticationToken auth =
+                        new UsernamePasswordAuthenticationToken(
+                                user,
+                                null,
+                                java.util.Collections.emptyList()
+                        );
+
+                SecurityContextHolder
+                        .getContext()
+                        .setAuthentication(auth);
+                }
+                else
+                {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write(
+                            "{\"message\":\"Invalid token\"}"
+                    );
+                    return;
+                }
+        }catch(Exception e)
         {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write(
+                    "{\"message\":\"Invalid or expired token\"}"
+            );
             return;
         }
+
 
 
         filterChain.doFilter(request, response);

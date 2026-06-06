@@ -6,7 +6,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "daily_checkins")
+@Table(name = "daily_checkins",uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id","date"})})
+
 public class DailyCheckIn
 {
     @Id
@@ -16,11 +17,17 @@ public class DailyCheckIn
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @Column(nullable = false)
     private LocalDate date;
+
     private LocalDateTime createdAt;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private CheckInStatus status;
+
+    @Column(length = 500)
     private String note;
 
     @PrePersist
@@ -28,6 +35,7 @@ public class DailyCheckIn
     {
         createdAt=LocalDateTime.now();
     }
+
 
     public Long getId() {return id;}
 

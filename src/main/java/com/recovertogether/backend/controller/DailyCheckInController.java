@@ -4,6 +4,10 @@ import com.recovertogether.backend.dto.CheckInRequest;
 import com.recovertogether.backend.dto.MessageResponse;
 import com.recovertogether.backend.service.DailyCheckInService;
 import org.springframework.web.bind.annotation.*;
+import com.recovertogether.backend.dto.CheckInResponse;
+import java.util.List;
+import com.recovertogether.backend.dto.StreakResponse;
+import com.recovertogether.backend.dto.CheckInStatsResponse;
 
 @RestController
 @RequestMapping("/checkin")
@@ -21,5 +25,29 @@ public class DailyCheckInController
     {
         dailyCheckInService.submitCheckIn(request);
         return new MessageResponse("Check-in submitted successfully");
+    }
+
+    @GetMapping("/history")
+    public List<CheckInResponse> getHistory(@RequestParam(defaultValue = "30") int limit)
+    {
+        return dailyCheckInService.getHistory(limit);
+    }
+
+    @GetMapping("/latest")
+    public CheckInResponse getLatestCheckIn()
+    {
+        return dailyCheckInService.getLatestCheckIn();
+    }
+
+    @GetMapping("/streak")
+    public StreakResponse getStreak()
+    {
+        return dailyCheckInService.getStreak();
+    }
+
+    @GetMapping("/stats")
+    public CheckInStatsResponse getStats()
+    {
+        return dailyCheckInService.getStats();
     }
 }
