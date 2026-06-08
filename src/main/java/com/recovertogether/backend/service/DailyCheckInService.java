@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import com.recovertogether.backend.service.PartnerRequestService;
 
 import java.util.List;
 
@@ -64,7 +65,6 @@ public class DailyCheckInService
 
         return new CheckInResponse(checkIn);
     }
-
 
     public StreakResponse calculateStreak(User user)
     {
@@ -177,5 +177,6 @@ public class DailyCheckInService
 
         return new CheckInStatsResponse(totalCheckIns, successCount, relapseCount, successRate, streak.getCurrentStreak(),streak.getBestStreak());
     }
+
 
 }

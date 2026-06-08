@@ -33,6 +33,9 @@ public class User {
 
     private LocalDateTime createdAt;
 
+    @Column
+    private LocalDateTime lastSeen;
+
     @PrePersist
     public void prePersist()
     {
@@ -67,4 +70,8 @@ public class User {
     public void setPassword(String password){this.password=password;}
 
     public LocalDateTime getCreatedAt(){return createdAt;}
+
+    public LocalDateTime getLastSeen() {return lastSeen;}
+
+    public void setLastSeen(LocalDateTime lastSeen) {this.lastSeen = lastSeen;}
 }

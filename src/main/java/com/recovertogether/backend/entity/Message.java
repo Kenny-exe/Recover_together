@@ -25,6 +25,12 @@ public class Message
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(nullable = false)
+    private boolean sosAlert=false;
+
+    @Column(nullable = false)
+    private boolean read = false;
+
     @PrePersist
     public void prePersist()
     {
@@ -50,4 +56,13 @@ public class Message
     public LocalDateTime getCreatedAt() {return createdAt;}
 
     public void setCreatedAt(LocalDateTime createdAt) {this.createdAt = createdAt;}
+
+    public boolean isSosAlert() {return sosAlert;}
+
+    public void setSosAlert(boolean sosAlert) {this.sosAlert = sosAlert;}
+
+    public boolean isRead() {return read;}
+
+    public void setRead(boolean read) {this.read = read;}
+
 }

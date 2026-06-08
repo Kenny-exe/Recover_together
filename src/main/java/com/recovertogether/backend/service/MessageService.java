@@ -1,6 +1,7 @@
 package com.recovertogether.backend.service;
 
 import com.recovertogether.backend.dto.ChatMessageResponse;
+import com.recovertogether.backend.dto.UnreadCountResponse;
 import com.recovertogether.backend.entity.Message;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.enums.PartnerRequestStatus;
@@ -68,7 +69,7 @@ public class MessageService
 
         messageRepository.save(message);
     }
-    public List<ChatMessageResponse> getConversation(Long partnerId)
+    public List<ChatMessageResponse> getConversation(Long partnerId, int limit)
     {
         User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
@@ -111,10 +112,33 @@ public class MessageService
                 )
         );
 
+        for(Message message:receivedMessages)
+        {
+            message.setRead(true);
+        }
+        messageRepository.saveAll(receivedMessages);
+
+        if(sentMessages.size() > limit)
+        {
+            sentMessages =
+                    sentMessages.subList(
+                            sentMessages.size() - limit,
+                            sentMessages.size()
+                    );
+        }
+
         return sentMessages
                 .stream()
                 .map(ChatMessageResponse::new)
                 .toList();
+    }
+
+    public UnreadCountResponse getReadCount()
+    {
+        User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        long count=messageRepository.countByReceiverAndReadFalse(currentUser);
+        return new UnreadCountResponse(count);
     }
 }
 

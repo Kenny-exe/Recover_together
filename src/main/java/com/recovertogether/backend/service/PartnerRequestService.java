@@ -6,6 +6,7 @@ import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.enums.PartnerRequestStatus;
 import com.recovertogether.backend.repository.PartnerRequestRepository;
 import com.recovertogether.backend.repository.UserRepository;
+import org.hibernate.validator.internal.util.stereotypes.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -193,5 +194,46 @@ public class PartnerRequestService
                         );
 
         partnerRequestRepository.delete(request);
+    }
+
+    public LastSeenResponse getPartnerLastSeen()
+    {
+        PartnerResponse partner = getCurrentPartner();
+        User partnerUser=userRepository.findByEmail(partner.getEmail()).orElseThrow();
+
+        return new LastSeenResponse(partnerUser.getName(), partnerUser.getLastSeen());
+    }
+
+    public User getCurrentPartnerUser()
+    {
+        User currentUser =
+                (User) SecurityContextHolder
+                        .getContext()
+                        .getAuthentication()
+                        .getPrincipal();
+
+        PartnerRequest request =
+                partnerRequestRepository
+                        .findFirstBySenderAndStatus(
+                                currentUser,
+                                PartnerRequestStatus.ACCEPTED)
+                        .orElseGet(() ->
+                                partnerRequestRepository
+                                        .findFirstByReceiverAndStatus(
+                                                currentUser,
+                                                PartnerRequestStatus.ACCEPTED)
+                                        .orElseThrow(() ->
+                                                new ResponseStatusException(
+                                                        HttpStatus.NOT_FOUND,
+                                                        "No partner found"
+                                                ))
+                        );
+
+        if(request.getSender().getId().equals(currentUser.getId()))
+        {
+            return request.getReceiver();
+        }
+
+        return request.getSender();
     }
 }

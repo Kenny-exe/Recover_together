@@ -67,4 +67,10 @@ public class PartnerRequestController
     {
         partnerRequestService.unpair(); return new MessageResponse("Partnership ended");
     }
+
+    @GetMapping("/last-seen")
+    public LastSeenResponse getPartnerLastSeen()
+    {
+        return partnerRequestService.getPartnerLastSeen();
+    }
 }

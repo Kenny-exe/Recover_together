@@ -13,6 +13,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 
 
 @Component
@@ -68,6 +69,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
 
+                user.setLastSeen(LocalDateTime.now());
+                userRepository.save(user);
+
                 UsernamePasswordAuthenticationToken auth =
                         new UsernamePasswordAuthenticationToken(
                                 user,
@@ -97,8 +101,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             );
             return;
         }
-
-
 
         filterChain.doFilter(request, response);
 
