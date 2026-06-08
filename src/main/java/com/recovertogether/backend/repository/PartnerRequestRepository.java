@@ -30,5 +30,8 @@ public interface PartnerRequestRepository extends  JpaRepository<PartnerRequest,
     Optional<PartnerRequest> findFirstByReceiverAndStatus(
             User receiver,
             PartnerRequestStatus status);
-    
+
+    List<PartnerRequest> findByStatus(
+            PartnerRequestStatus status
+    );
 }
