@@ -10,6 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import com.recovertogether.backend.entity.Notification;
+import com.recovertogether.backend.enums.NotificationType;
 import java.util.List;
 
 @Service
@@ -48,5 +50,15 @@ public class NotificationService
             notification.setRead(true);
             notificationRepository.save(notification);
         }
+    }
+
+    public void createNotification(User receiver, NotificationType type, String message)
+    {
+        Notification notification=new Notification();
+
+        notification.setReceiver(receiver);
+        notification.setType(type);
+        notification.setMessage(message);
+        notificationRepository.save(notification);
     }
 }

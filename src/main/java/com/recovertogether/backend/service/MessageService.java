@@ -4,6 +4,7 @@ import com.recovertogether.backend.dto.ChatMessageResponse;
 import com.recovertogether.backend.dto.UnreadCountResponse;
 import com.recovertogether.backend.entity.Message;
 import com.recovertogether.backend.entity.User;
+import com.recovertogether.backend.enums.NotificationType;
 import com.recovertogether.backend.enums.PartnerRequestStatus;
 import com.recovertogether.backend.repository.MessageRepository;
 import com.recovertogether.backend.repository.PartnerRequestRepository;
@@ -20,15 +21,18 @@ public class MessageService
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final PartnerRequestRepository partnerRequestRepository;
+    private final NotificationService notificationService;
 
     public MessageService(
             MessageRepository messageRepository,
             UserRepository userRepository,
-            PartnerRequestRepository partnerRequestRepository)
+            PartnerRequestRepository partnerRequestRepository,
+            NotificationService notificationService)
     {
         this.messageRepository = messageRepository;
         this.userRepository = userRepository;
         this.partnerRequestRepository = partnerRequestRepository;
+        this.notificationService=notificationService;
     }
 
     public void sendMessage(Long receiverId, String content)
@@ -68,6 +72,11 @@ public class MessageService
         message.setContent(content);
 
         messageRepository.save(message);
+
+        notificationService.createNotification(
+                receiver,
+                NotificationType.NEW_MESSAGE, sender.getName() + " sent you a message"
+        );
     }
     public List<ChatMessageResponse> getConversation(Long partnerId, int limit)
     {
