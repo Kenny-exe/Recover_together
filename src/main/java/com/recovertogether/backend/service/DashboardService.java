@@ -2,6 +2,7 @@ package com.recovertogether.backend.service;
 
 import com.recovertogether.backend.dto.*;
 import org.springframework.stereotype.Service;
+import com.recovertogether.backend.dto.PartnerStatusResponse;
 
 @Service
 public class DashboardService
@@ -9,15 +10,18 @@ public class DashboardService
     private final DailyCheckInService dailyCheckInService;
     private final PartnerRequestService partnerRequestService;
     private final MessageService messageService;
+    private final PartnerCheckInService partnerCheckInService;
 
     public DashboardService(
             DailyCheckInService dailyCheckInService,
             PartnerRequestService partnerRequestService,
-            MessageService messageService)
+            MessageService messageService,
+            PartnerCheckInService partnerCheckInService)
     {
         this.dailyCheckInService = dailyCheckInService;
         this.partnerRequestService = partnerRequestService;
         this.messageService = messageService;
+        this.partnerCheckInService = partnerCheckInService;
     }
 
     public DashboardResponse getDashboard()
@@ -37,6 +41,16 @@ public class DashboardService
         UnreadCountResponse unread =
                 messageService.getReadCount();
 
+        PartnerStatusResponse partnerStatus;
+        try
+        {
+            partnerStatus=partnerCheckInService.getPartnerStatus();
+        }
+        catch (Exception e)
+        {
+            partnerStatus=new PartnerStatusResponse(false,-1,null);
+        }
+
         return new DashboardResponse(
                 streak.getCurrentStreak(),
                 streak.getBestStreak(),
@@ -52,7 +66,9 @@ public class DashboardService
                 partnerSummary.getCurrentStreak(),
                 partnerSummary.getBestStreak(),
 
-                partnerLastSeen.getLastSeen()
+                partnerLastSeen.getLastSeen(),
+                partnerStatus.isPartnerCheckedInToday(),
+                partnerStatus.getDaysSinceLastCheckIn()
         );
     }
 }

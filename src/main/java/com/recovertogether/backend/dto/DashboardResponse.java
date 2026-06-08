@@ -6,18 +6,17 @@ public class DashboardResponse
 {
     private int currentStreak;
     private int bestStreak;
-
     private long totalCheckIns;
     private long successCount;
     private long relapseCount;
     private double successRate;
-
     private long unreadMessages;
-
     private String partnerName;
     private int partnerCurrentStreak;
     private int partnerBestStreak;
     private LocalDateTime partnerLastSeen;
+    private boolean partnerCheckedInToday;
+    private long daysSinceLastCheckIn;
 
     public DashboardResponse(
             int currentStreak,
@@ -30,7 +29,9 @@ public class DashboardResponse
             String partnerName,
             int partnerCurrentStreak,
             int partnerBestStreak,
-            LocalDateTime partnerLastSeen)
+            LocalDateTime partnerLastSeen,
+            boolean partnerCheckedInToday,
+            long daysSinceLastCheckIn)
     {
         this.currentStreak = currentStreak;
         this.bestStreak = bestStreak;
@@ -43,24 +44,21 @@ public class DashboardResponse
         this.partnerCurrentStreak = partnerCurrentStreak;
         this.partnerBestStreak = partnerBestStreak;
         this.partnerLastSeen = partnerLastSeen;
+        this.partnerCheckedInToday = partnerCheckedInToday;
+        this.daysSinceLastCheckIn = daysSinceLastCheckIn;
     }
 
     public int getCurrentStreak(){ return currentStreak; }
     public int getBestStreak(){ return bestStreak; }
-
     public long getTotalCheckIns(){ return totalCheckIns; }
     public long getSuccessCount(){ return successCount; }
     public long getRelapseCount(){ return relapseCount; }
     public double getSuccessRate(){ return successRate; }
-
     public long getUnreadMessages(){ return unreadMessages; }
-
     public String getPartnerName(){ return partnerName; }
     public int getPartnerCurrentStreak(){ return partnerCurrentStreak; }
     public int getPartnerBestStreak(){ return partnerBestStreak; }
-
-    public LocalDateTime getPartnerLastSeen()
-    {
-        return partnerLastSeen;
-    }
+    public LocalDateTime getPartnerLastSeen() {return partnerLastSeen;}
+    public boolean isPartnerCheckedInToday() {return partnerCheckedInToday;}
+    public long getDaysSinceLastCheckIn() {return daysSinceLastCheckIn;}
 }

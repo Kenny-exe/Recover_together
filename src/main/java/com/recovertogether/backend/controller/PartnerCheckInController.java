@@ -1,6 +1,7 @@
 package com.recovertogether.backend.controller;
 
 import com.recovertogether.backend.dto.CheckInResponse;
+import com.recovertogether.backend.dto.PartnerStatusResponse;
 import com.recovertogether.backend.service.PartnerCheckInService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,5 +33,11 @@ public class PartnerCheckInController
             @RequestParam(defaultValue = "30") int limit)
     {
         return partnerCheckInService.getPartnerHistory(limit);
+    }
+
+    @GetMapping("/status")
+    public PartnerStatusResponse getPartnerStatus()
+    {
+        return partnerCheckInService.getPartnerStatus();
     }
 }

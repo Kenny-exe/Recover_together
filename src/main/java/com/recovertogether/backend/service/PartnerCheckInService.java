@@ -7,6 +7,9 @@ import com.recovertogether.backend.repository.DailyCheckInRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import com.recovertogether.backend.dto.PartnerStatusResponse;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 import java.util.List;
 
@@ -51,5 +54,18 @@ public class PartnerCheckInService
                 .limit(limit)
                 .map(CheckInResponse::new)
                 .toList();
+    }
+
+    public PartnerStatusResponse getPartnerStatus()
+    {
+        User partnerUser=partnerRequestService.getCurrentPartnerUser();
+
+        DailyCheckIn latestCheckIn=dailyCheckInRepository.findTopByUserOrderByDateDesc(partnerUser).orElseThrow(()->
+                new ResponseStatusException(HttpStatus.NOT_FOUND,"Partner has not check-ins"));
+
+        LocalDate lastDate=latestCheckIn.getDate();
+        boolean checkedInToday=lastDate.equals(LocalDate.now());
+        long daysSince=ChronoUnit.DAYS.between(lastDate,LocalDate.now());
+        return new PartnerStatusResponse(checkedInToday, daysSince, lastDate);
     }
 }
