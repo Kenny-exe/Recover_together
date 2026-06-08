@@ -2,6 +2,8 @@ package com.recovertogether.backend.controller;
 
 import com.recovertogether.backend.dto.*;
 import com.recovertogether.backend.service.DailyCheckInService;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,7 +20,7 @@ public class DailyCheckInController
     }
 
     @PostMapping
-    public MessageResponse submitCheckIn(@RequestBody CheckInRequest request)
+    public MessageResponse submitCheckIn(@Valid @RequestBody CheckInRequest request)
     {
         dailyCheckInService.submitCheckIn(request);
         return new MessageResponse("Check-in submitted successfully");

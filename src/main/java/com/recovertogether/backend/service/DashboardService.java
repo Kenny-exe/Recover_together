@@ -3,6 +3,7 @@ package com.recovertogether.backend.service;
 import com.recovertogether.backend.dto.*;
 import org.springframework.stereotype.Service;
 import com.recovertogether.backend.dto.PartnerStatusResponse;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class DashboardService
@@ -46,7 +47,7 @@ public class DashboardService
         {
             partnerStatus=partnerCheckInService.getPartnerStatus();
         }
-        catch (Exception e)
+        catch (ResponseStatusException e)
         {
             partnerStatus=new PartnerStatusResponse(false,-1,null);
         }

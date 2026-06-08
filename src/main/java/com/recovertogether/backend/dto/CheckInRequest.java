@@ -1,9 +1,11 @@
 package com.recovertogether.backend.dto;
 
 import com.recovertogether.backend.enums.CheckInStatus;
+import jakarta.validation.constraints.NotNull;
 
 public class CheckInRequest
 {
+    @NotNull
     private CheckInStatus status;
     private String note;
 
