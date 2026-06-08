@@ -2,15 +2,20 @@ package com.recovertogether.backend.service;
 
 import com.recovertogether.backend.dto.*;
 import com.recovertogether.backend.entity.DailyCheckIn;
+import com.recovertogether.backend.entity.PartnerRequest;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.enums.CheckInStatus;
+import com.recovertogether.backend.enums.PartnerRequestStatus;
 import com.recovertogether.backend.repository.DailyCheckInRepository;
+import com.recovertogether.backend.repository.PartnerRequestRepository;
 import com.recovertogether.backend.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import com.recovertogether.backend.service.PartnerRequestService;
+import com.recovertogether.backend.enums.NotificationType;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -21,11 +26,18 @@ public class DailyCheckInService
 {
     private final DailyCheckInRepository dailyCheckInRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
+    private final PartnerRequestRepository partnerRequestRepository;
 
-    public DailyCheckInService(DailyCheckInRepository dailyCheckInRepository, UserRepository userRepository)
+    public DailyCheckInService(DailyCheckInRepository dailyCheckInRepository,
+                               UserRepository userRepository,
+                               NotificationService notificationService,
+                               PartnerRequestRepository partnerRequestRepository)
     {
         this.dailyCheckInRepository=dailyCheckInRepository;
         this.userRepository=userRepository;
+        this.notificationService=notificationService;
+        this.partnerRequestRepository=partnerRequestRepository;
     }
 
     public void submitCheckIn(CheckInRequest request)
@@ -48,6 +60,29 @@ public class DailyCheckInService
         checkIn.setNote(request.getNote());
 
         dailyCheckInRepository.save(checkIn);
+
+        if(request.getStatus()==CheckInStatus.RELAPSE)
+        {
+
+            PartnerRequest partnerRequest=partnerRequestRepository.findFirstBySenderAndStatus(currentUser, PartnerRequestStatus.ACCEPTED).orElseGet(()->
+            partnerRequestRepository.findFirstByReceiverAndStatus(currentUser,PartnerRequestStatus.ACCEPTED).orElse(null));
+
+            if(partnerRequest!=null)
+            {
+                User partner;
+
+                if(partnerRequest.getSender().getId().equals(currentUser.getId()))
+                {
+                    partner=partnerRequest.getReceiver();
+                }
+                else
+                {
+                    partner=partnerRequest.getSender();
+                }
+
+                notificationService.createNotification(partner, NotificationType.PARTNER_RELAPSE,currentUser.getName()+" reported a relapse today");
+            }
+        }
     }
 
     public List<CheckInResponse> getHistory(int limit)
