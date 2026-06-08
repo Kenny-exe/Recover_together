@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import com.recovertogether.backend.enums.NotificationType;
 
 import java.time.LocalDateTime;
 
@@ -18,11 +19,15 @@ public class SupportService
 {
     private final PartnerRequestRepository partnerRequestRepository;
     private final MessageRepository messageRepository;
+    private final NotificationService notificationService;
 
-    public SupportService(PartnerRequestRepository partnerRequestRepository, MessageRepository messageRepository)
+    public SupportService(PartnerRequestRepository partnerRequestRepository,
+                          MessageRepository messageRepository,
+                          NotificationService notificationService)
     {
         this.messageRepository=messageRepository;
         this.partnerRequestRepository=partnerRequestRepository;
+        this.notificationService=notificationService;
     }
 
     public void sendSOS()
@@ -57,6 +62,8 @@ public class SupportService
         sosMessage.setContent("SOS ALERT! YOUR PARTNER NEEDS HELP RIGHT NOW");
         sosMessage.setSosAlert(true);
         messageRepository.save(sosMessage);
+
+        notificationService.createNotification(partner,NotificationType.SOS_ALERT, currentUser.getName()+" NEEDS SUPPORT IMMEDIATELY");
 
     }
 }
