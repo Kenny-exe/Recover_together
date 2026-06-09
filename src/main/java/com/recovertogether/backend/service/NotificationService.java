@@ -6,6 +6,7 @@ import com.recovertogether.backend.entity.Notification;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.enums.NotificationType;
 import com.recovertogether.backend.repository.NotificationRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -60,5 +61,30 @@ public class NotificationService
         notification.setType(type);
         notification.setMessage(message);
         notificationRepository.save(notification);
+    }
+
+    @Transactional
+    public void deleteNotification(Long id)
+    {
+        User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        long deleted=notificationRepository.deleteByIdAndReceiver(id,currentUser);
+
+        if(deleted==0)
+        {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Notification not found");
+        }
+    }
+
+    public void markAllAsRead()
+    {
+        User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        List<Notification> notifications=notificationRepository.findByReceiverAndReadFalse(currentUser);
+
+        for(Notification notification: notifications)
+        {
+            notification.setRead(true);
+        }
+        notificationRepository.saveAll(notifications);
     }
 }

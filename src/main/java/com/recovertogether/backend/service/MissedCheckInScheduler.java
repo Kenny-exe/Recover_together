@@ -34,7 +34,7 @@ public class MissedCheckInScheduler
         this.notificationRepository=notificationRepository;
     }
 
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(cron = "0 0 21 * * *")
     public void checkMissedCheckIns()
     {
         List<PartnerRequest> partnerships=partnerRequestRepository.findByStatus(PartnerRequestStatus.ACCEPTED);

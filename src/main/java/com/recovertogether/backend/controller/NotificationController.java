@@ -42,4 +42,18 @@ public class NotificationController
                 "Notification marked as read"
         );
     }
+
+    @DeleteMapping("/{id}")
+    public MessageResponse deleteNotification(@PathVariable Long id)
+    {
+        notificationService.deleteNotification(id);
+        return new MessageResponse("Notification deleted");
+    }
+
+    @PutMapping("/read-all")
+    public  MessageResponse markAllAsRead()
+    {
+        notificationService.markAllAsRead();
+        return new MessageResponse("All notifications marked as read");
+    }
 }
