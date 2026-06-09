@@ -21,9 +21,9 @@ public class NotificationController
     }
 
     @GetMapping
-    public List<NotificationResponse> getNotifications()
+    public List<NotificationResponse> getNotifications(@RequestParam(defaultValue = "20")int limit)
     {
-        return notificationService.getNotifications();
+        return notificationService.getNotifications(limit);
     }
 
     @GetMapping("/unread-count")
@@ -55,5 +55,12 @@ public class NotificationController
     {
         notificationService.markAllAsRead();
         return new MessageResponse("All notifications marked as read");
+    }
+
+    @DeleteMapping("/all")
+    public MessageResponse deleteAllNotifications()
+    {
+        notificationService.deleteAllNotifications();
+        return new MessageResponse("All notifications deleted");
     }
 }

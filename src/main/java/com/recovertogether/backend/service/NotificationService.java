@@ -11,8 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import com.recovertogether.backend.entity.Notification;
-import com.recovertogether.backend.enums.NotificationType;
+
 import java.util.List;
 
 @Service
@@ -25,10 +24,15 @@ public class NotificationService
         this.notificationRepository=notificationRepository;
     }
 
-    public List<NotificationResponse> getNotifications()
+    public List<NotificationResponse> getNotifications(int limit)
     {
         User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return notificationRepository.findByReceiverOrderByCreatedAtDesc(currentUser).stream().map(NotificationResponse::new).toList();
+        if(limit < 1)
+        {limit = 1;}
+
+        else if(limit > 100)
+        {limit = 100;}
+        return notificationRepository.findByReceiverOrderByCreatedAtDesc(currentUser).stream().limit(limit).map(NotificationResponse::new).toList();
     }
 
     public UnreadCountResponse getUnreadCount()
@@ -86,5 +90,13 @@ public class NotificationService
             notification.setRead(true);
         }
         notificationRepository.saveAll(notifications);
+    }
+
+    @Transactional
+    public void deleteAllNotifications()
+    {
+        User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        notificationRepository.deleteByReceiver(currentUser);
     }
 }
