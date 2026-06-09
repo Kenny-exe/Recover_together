@@ -17,6 +17,7 @@ public class DashboardResponse
     private LocalDateTime partnerLastSeen;
     private boolean partnerCheckedInToday;
     private long daysSinceLastCheckIn;
+    private long achievementCount;
 
     public DashboardResponse(
             int currentStreak,
@@ -31,7 +32,8 @@ public class DashboardResponse
             int partnerBestStreak,
             LocalDateTime partnerLastSeen,
             boolean partnerCheckedInToday,
-            long daysSinceLastCheckIn)
+            long daysSinceLastCheckIn,
+            long achievementCount)
     {
         this.currentStreak = currentStreak;
         this.bestStreak = bestStreak;
@@ -46,6 +48,7 @@ public class DashboardResponse
         this.partnerLastSeen = partnerLastSeen;
         this.partnerCheckedInToday = partnerCheckedInToday;
         this.daysSinceLastCheckIn = daysSinceLastCheckIn;
+        this.achievementCount = achievementCount;
     }
 
     public int getCurrentStreak(){ return currentStreak; }
@@ -61,4 +64,6 @@ public class DashboardResponse
     public LocalDateTime getPartnerLastSeen() {return partnerLastSeen;}
     public boolean isPartnerCheckedInToday() {return partnerCheckedInToday;}
     public long getDaysSinceLastCheckIn() {return daysSinceLastCheckIn;}
+    public long getAchievementCount() {return achievementCount;}
+    public void setAchievementCount(long achievementCount) {this.achievementCount = achievementCount;}
 }

@@ -1,5 +1,7 @@
 package com.recovertogether.backend.dto;
 
+import org.springframework.web.server.ResponseStatusException;
+
 public class PartnerSummaryResponse
 {
     private String name;

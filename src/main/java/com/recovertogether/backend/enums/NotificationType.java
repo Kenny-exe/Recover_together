@@ -5,5 +5,6 @@ public enum NotificationType
     NEW_MESSAGE,
     SOS_ALERT,
     PARTNER_RELAPSE,
-    MISSED_CHECKIN
+    MISSED_CHECKIN,
+    MILESTONE_REACHED
 }

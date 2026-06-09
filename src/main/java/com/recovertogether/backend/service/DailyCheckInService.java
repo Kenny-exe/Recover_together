@@ -28,16 +28,19 @@ public class DailyCheckInService
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final PartnerRequestRepository partnerRequestRepository;
+    private final AchievementService achievementService;
 
     public DailyCheckInService(DailyCheckInRepository dailyCheckInRepository,
                                UserRepository userRepository,
                                NotificationService notificationService,
-                               PartnerRequestRepository partnerRequestRepository)
+                               PartnerRequestRepository partnerRequestRepository,
+                               AchievementService achievementService)
     {
         this.dailyCheckInRepository=dailyCheckInRepository;
         this.userRepository=userRepository;
         this.notificationService=notificationService;
         this.partnerRequestRepository=partnerRequestRepository;
+        this.achievementService=achievementService;
     }
 
     public void submitCheckIn(CheckInRequest request)
@@ -60,6 +63,8 @@ public class DailyCheckInService
         checkIn.setNote(request.getNote());
 
         dailyCheckInRepository.save(checkIn);
+        StreakResponse streak=calculateStreak(currentUser);
+        achievementService.checkMilestones(currentUser, streak.getCurrentStreak());
 
         if(request.getStatus()==CheckInStatus.RELAPSE)
         {
