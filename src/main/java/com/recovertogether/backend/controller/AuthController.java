@@ -5,7 +5,6 @@ import com.recovertogether.backend.dto.LoginRequest;
 import com.recovertogether.backend.service.JwtService;
 import com.recovertogether.backend.service.UserService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import org.springframework.web.bind.annotation.*;
 
 @RestController

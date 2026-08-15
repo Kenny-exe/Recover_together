@@ -66,6 +66,13 @@ public class MessageService
         {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Message cannot be empty");
         }
+        if(content.length() > 1000)
+        {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Message too long"
+            );
+        }
 
         message.setSender(sender);
         message.setReceiver(receiver);
@@ -142,7 +149,7 @@ public class MessageService
                 .toList();
     }
 
-    public UnreadCountResponse getReadCount()
+    public UnreadCountResponse getUnreadCount()
     {
         User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 

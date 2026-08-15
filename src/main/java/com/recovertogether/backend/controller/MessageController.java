@@ -44,6 +44,6 @@ public class MessageController
     @GetMapping("/unread-count")
     public UnreadCountResponse getUnreadCount()
     {
-        return messageService.getReadCount();
+        return messageService.getUnreadCount();
     }
 }

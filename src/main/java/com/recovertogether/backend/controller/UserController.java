@@ -9,9 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.security.core.context.SecurityContextHolder;
-import com.recovertogether.backend.entity.User;
-
 
 @RestController
 @RequestMapping("/users")

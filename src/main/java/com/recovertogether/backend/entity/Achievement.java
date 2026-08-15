@@ -1,12 +1,12 @@
 package com.recovertogether.backend.entity;
 
 import jakarta.persistence.*;
-import jakarta.transaction.Transactional;
-
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "achievements", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id","title"}))
+@Table(name = "achievements", uniqueConstraints =
+@UniqueConstraint(columnNames = {"user_id","title"}), indexes =
+        {@Index(name = "idx_achievement_user",columnList = "user_id")})
 public class Achievement
 {
     @Id
@@ -16,8 +16,8 @@ public class Achievement
     private String title;
     private LocalDateTime earnedAt;
 
-    @ManyToOne
-    @JoinColumn(name="user_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @PrePersist

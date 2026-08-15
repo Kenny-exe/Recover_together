@@ -2,11 +2,10 @@ package com.recovertogether.backend.entity;
 
 import com.recovertogether.backend.enums.NotificationType;
 import jakarta.persistence.*;
-
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "notifications")
+@Table(name = "notifications",indexes = {@Index(name = "idx_notification_receiver",columnList = "receiver_id")})
 public class Notification
 {
     @Id

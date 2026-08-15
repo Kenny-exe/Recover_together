@@ -10,7 +10,6 @@ import org.springframework.web.server.ResponseStatusException;
 import com.recovertogether.backend.dto.PartnerStatusResponse;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-
 import java.util.List;
 
 @Service

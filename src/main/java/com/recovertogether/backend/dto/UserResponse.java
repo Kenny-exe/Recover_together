@@ -1,4 +1,5 @@
 package com.recovertogether.backend.dto;
+
 import com.recovertogether.backend.entity.User;
 import java.time.LocalDateTime;
 

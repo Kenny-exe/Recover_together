@@ -13,9 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import com.recovertogether.backend.service.PartnerRequestService;
 import com.recovertogether.backend.enums.NotificationType;
-import org.springframework.web.server.ResponseStatusException;
+import java.time.LocalDate;
+import com.recovertogether.backend.dto.WeeklyReportResponse;
 
 import java.util.List;
 
@@ -218,5 +218,56 @@ public class DailyCheckInService
         return new CheckInStatsResponse(totalCheckIns, successCount, relapseCount, successRate, streak.getCurrentStreak(),streak.getBestStreak());
     }
 
+    public WeeklyReportResponse getWeeklyReport()
+    {
+        User currentUser =
+                (User) SecurityContextHolder
+                        .getContext()
+                        .getAuthentication()
+                        .getPrincipal();
 
+        LocalDate weekAgo =
+                LocalDate.now().minusDays(7);
+
+        List<DailyCheckIn> checkIns =
+                dailyCheckInRepository
+                        .findByUserAndDateAfterOrderByDateDesc(
+                                currentUser,
+                                weekAgo
+                        );
+
+        long successDays =
+                checkIns.stream()
+                        .filter(c ->
+                                c.getStatus() ==
+                                        CheckInStatus.SUCCESS)
+                        .count();
+
+        long relapseDays =
+                checkIns.stream()
+                        .filter(c ->
+                                c.getStatus() ==
+                                        CheckInStatus.RELAPSE)
+                        .count();
+
+        double successRate = 0.0;
+
+        if(!checkIns.isEmpty())
+        {
+            successRate =
+                    ((double) successDays
+                            / checkIns.size()) * 100;
+        }
+
+        StreakResponse streak =
+                calculateStreak(currentUser);
+
+        return new WeeklyReportResponse(
+                successDays,
+                relapseDays,
+                successRate,
+                streak.getCurrentStreak(),
+                streak.getBestStreak()
+        );
+    }
 }

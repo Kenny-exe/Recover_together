@@ -2,9 +2,7 @@ package com.recovertogether.backend.entity;
 
 import com.recovertogether.backend.enums.PartnerRequestStatus;
 import jakarta.persistence.*;
-
 import java.time.LocalDateTime;
-
 
 @Entity
 @Table(name = "partner_requests", uniqueConstraints = {@UniqueConstraint(columnNames = {"sender_id","receiver_id"})})

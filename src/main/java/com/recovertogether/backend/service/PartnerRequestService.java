@@ -6,12 +6,10 @@ import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.enums.PartnerRequestStatus;
 import com.recovertogether.backend.repository.PartnerRequestRepository;
 import com.recovertogether.backend.repository.UserRepository;
-import org.hibernate.validator.internal.util.stereotypes.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import com.recovertogether.backend.repository.DailyCheckInRepository;
 
 import java.util.List;
 
@@ -227,6 +225,36 @@ public class PartnerRequestService
                                                         HttpStatus.NOT_FOUND,
                                                         "No partner found"
                                                 ))
+                        );
+
+        if(request.getSender().getId().equals(currentUser.getId()))
+        {
+            return request.getReceiver();
+        }
+
+        return request.getSender();
+    }
+
+    public User getPartner(User currentUser)
+    {
+        PartnerRequest request =
+                partnerRequestRepository
+                        .findFirstBySenderAndStatus(
+                                currentUser,
+                                PartnerRequestStatus.ACCEPTED
+                        )
+                        .orElseGet(() ->
+                                partnerRequestRepository
+                                        .findFirstByReceiverAndStatus(
+                                                currentUser,
+                                                PartnerRequestStatus.ACCEPTED
+                                        )
+                                        .orElseThrow(() ->
+                                                new ResponseStatusException(
+                                                        HttpStatus.NOT_FOUND,
+                                                        "No partner found"
+                                                )
+                                        )
                         );
 
         if(request.getSender().getId().equals(currentUser.getId()))

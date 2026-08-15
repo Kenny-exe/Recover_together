@@ -8,7 +8,6 @@ public class AchievementResponse
 {
     private String title;
     private LocalDateTime earnedAt;
-    private long achievementCount;
 
     public AchievementResponse(Achievement achievement)
     {
@@ -18,6 +17,4 @@ public class AchievementResponse
 
     public String getTitle() {return title;}
     public LocalDateTime getEarnedAt() {return earnedAt;}
-    public long getAchievementCount() {return achievementCount;}
-    public void setAchievementCount(long achievementCount) {this.achievementCount = achievementCount;}
 }

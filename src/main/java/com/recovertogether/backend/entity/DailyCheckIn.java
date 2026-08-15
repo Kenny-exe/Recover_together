@@ -6,7 +6,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "daily_checkins",uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id","date"})})
+@Table(name = "daily_checkins", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id","date"}),
+indexes = @Index(name = "idx_checkin_date",columnList = "date"))
 
 public class DailyCheckIn
 {

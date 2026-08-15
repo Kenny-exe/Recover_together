@@ -11,7 +11,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.recovertogether.backend.service.JwtService;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-
 import java.io.IOException;
 import java.time.LocalDateTime;
 
@@ -40,12 +39,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 
         String authHeader = request.getHeader("Authorization");
+
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write(
-                    "{\"message\":\"Invalid or expired token\"}"
-            );
+            filterChain.doFilter(request, response);
             return;
         }
 

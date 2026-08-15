@@ -3,7 +3,6 @@ package com.recovertogether.backend.controller;
 import com.recovertogether.backend.dto.*;
 import com.recovertogether.backend.service.DailyCheckInService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -49,4 +48,7 @@ public class DailyCheckInController
     {
         return dailyCheckInService.getStats();
     }
+
+    @GetMapping("/weekly-report")
+    public WeeklyReportResponse getWeeklyReport() {return dailyCheckInService.getWeeklyReport();}
 }

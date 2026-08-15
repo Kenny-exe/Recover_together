@@ -1,9 +1,9 @@
 package com.recovertogether.backend.repository;
+
 import com.recovertogether.backend.entity.PartnerRequest;
 import com.recovertogether.backend.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import com.recovertogether.backend.enums.PartnerRequestStatus;
-
 import java.util.List;
 import java.util.Optional;
 

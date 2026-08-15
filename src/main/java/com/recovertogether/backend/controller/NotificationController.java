@@ -5,7 +5,6 @@ import com.recovertogether.backend.dto.NotificationResponse;
 import com.recovertogether.backend.dto.UnreadCountResponse;
 import com.recovertogether.backend.service.NotificationService;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController

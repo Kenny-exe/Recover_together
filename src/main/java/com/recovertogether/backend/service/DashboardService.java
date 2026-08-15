@@ -72,7 +72,7 @@ public class DashboardService
         }
 
         UnreadCountResponse unread =
-                messageService.getReadCount();
+                messageService.getUnreadCount();
 
         long achievementCount =
                 achievementRepository.countByUser(currentUser);

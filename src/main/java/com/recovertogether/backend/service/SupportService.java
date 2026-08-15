@@ -20,34 +20,24 @@ public class SupportService
     private final PartnerRequestRepository partnerRequestRepository;
     private final MessageRepository messageRepository;
     private final NotificationService notificationService;
+    private final PartnerRequestService partnerRequestService;
 
     public SupportService(PartnerRequestRepository partnerRequestRepository,
                           MessageRepository messageRepository,
-                          NotificationService notificationService)
+                          NotificationService notificationService,
+                          PartnerRequestService partnerRequestService)
     {
         this.messageRepository=messageRepository;
         this.partnerRequestRepository=partnerRequestRepository;
         this.notificationService=notificationService;
+        this.partnerRequestService=partnerRequestService;
     }
 
     public void sendSOS()
     {
         User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        PartnerRequest request=partnerRequestRepository.findFirstBySenderAndStatus(currentUser,PartnerRequestStatus.ACCEPTED).orElseGet(()->
-                partnerRequestRepository.findFirstByReceiverAndStatus(currentUser,PartnerRequestStatus.ACCEPTED).orElseThrow(()->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND,"No partner found")));
-
-        User partner;
-
-        if(request.getSender().getId().equals(currentUser.getId()))
-        {
-            partner=request.getReceiver();
-        }
-        else
-        {
-            partner=request.getSender();
-        }
+        User partner = partnerRequestService.getPartner(currentUser);
 
         boolean recentSOS=messageRepository.existsBySenderAndSosAlertTrueAndCreatedAtAfter(currentUser, LocalDateTime.now().minusMinutes(1));
         if(recentSOS)

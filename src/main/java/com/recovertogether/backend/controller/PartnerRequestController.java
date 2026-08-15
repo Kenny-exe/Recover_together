@@ -1,9 +1,8 @@
 package com.recovertogether.backend.controller;
+
 import com.recovertogether.backend.dto.*;
 import com.recovertogether.backend.service.PartnerRequestService;
 import org.springframework.web.bind.annotation.*;
-
-
 import java.util.List;
 
 @RestController

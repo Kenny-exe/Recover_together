@@ -2,7 +2,6 @@ package com.recovertogether.backend.dto;
 
 import com.recovertogether.backend.entity.DailyCheckIn;
 import com.recovertogether.backend.enums.CheckInStatus;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
