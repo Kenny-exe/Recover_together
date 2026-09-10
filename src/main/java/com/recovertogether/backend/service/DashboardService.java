@@ -1,13 +1,17 @@
 package com.recovertogether.backend.service;
 
 import com.recovertogether.backend.dto.*;
-import com.recovertogether.backend.repository.AchievementRepository;
-import org.springframework.stereotype.Service;
-import com.recovertogether.backend.dto.PartnerStatusResponse;
-import org.springframework.web.server.ResponseStatusException;
+import com.recovertogether.backend.entity.DailyCheckIn;
 import com.recovertogether.backend.entity.User;
+import com.recovertogether.backend.repository.AchievementRepository;
+import com.recovertogether.backend.repository.DailyCheckInRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 
 @Service
 public class DashboardService
@@ -15,21 +19,21 @@ public class DashboardService
     private final DailyCheckInService dailyCheckInService;
     private final PartnerRequestService partnerRequestService;
     private final MessageService messageService;
-    private final PartnerCheckInService partnerCheckInService;
+    private final DailyCheckInRepository dailyCheckInRepository;
     private final AchievementRepository achievementRepository;
 
     public DashboardService(
             DailyCheckInService dailyCheckInService,
             PartnerRequestService partnerRequestService,
             MessageService messageService,
-            PartnerCheckInService partnerCheckInService,
+            DailyCheckInRepository dailyCheckInRepository,
             AchievementRepository achievementRepository)
     {
         this.dailyCheckInService = dailyCheckInService;
         this.partnerRequestService = partnerRequestService;
         this.messageService = messageService;
-        this.partnerCheckInService = partnerCheckInService;
-        this.achievementRepository=achievementRepository;
+        this.dailyCheckInRepository = dailyCheckInRepository;
+        this.achievementRepository = achievementRepository;
     }
 
     public DashboardResponse getDashboard()
@@ -43,56 +47,46 @@ public class DashboardService
         CheckInStatsResponse stats =
                 dailyCheckInService.getStats();
 
-        StreakResponse streak =
-                dailyCheckInService.getStreak();
-
-        PartnerSummaryResponse partnerSummary;
-        try
-        {
-            partnerSummary = partnerRequestService.getPartnerSummary();
-        }
-        catch(ResponseStatusException e)
-        {
-            partnerSummary =
-                    new PartnerSummaryResponse(
-                            null,
-                            null,
-                            0,
-                            0);
-        }
-
-        LastSeenResponse partnerLastSeen;
-        try
-        {
-            partnerLastSeen = partnerRequestService.getPartnerLastSeen();
-        }
-        catch(ResponseStatusException e)
-        {
-            partnerLastSeen = new LastSeenResponse(null,null);
-        }
-
         UnreadCountResponse unread =
                 messageService.getUnreadCount();
 
         long achievementCount =
                 achievementRepository.countByUser(currentUser);
 
-        PartnerStatusResponse partnerStatus;
-        try
+        Optional<User> partnerOpt =
+                partnerRequestService.findPartnerUser(currentUser);
+
+        String partnerName = null;
+        int partnerCurrentStreak = 0;
+        int partnerBestStreak = 0;
+        LocalDateTime partnerLastSeen = null;
+        boolean partnerCheckedInToday = false;
+        long daysSinceLastCheckIn = -1;
+
+        if (partnerOpt.isPresent())
         {
-            partnerStatus=partnerCheckInService.getPartnerStatus();
-        }
-        catch (ResponseStatusException e)
-        {
-            partnerStatus=new PartnerStatusResponse(
-                    false,
-                    -1,
-                    null);
+            User partner = partnerOpt.get();
+            partnerName = partner.getName();
+            partnerLastSeen = partner.getLastSeen();
+
+            StreakResponse partnerStreak =
+                    dailyCheckInService.calculateStreak(partner);
+            partnerCurrentStreak = partnerStreak.getCurrentStreak();
+            partnerBestStreak = partnerStreak.getBestStreak();
+
+            Optional<DailyCheckIn> latestCheckIn =
+                    dailyCheckInRepository.findTopByUserOrderByDateDesc(partner);
+            if (latestCheckIn.isPresent())
+            {
+                LocalDate lastDate = latestCheckIn.get().getDate();
+                partnerCheckedInToday = lastDate.equals(LocalDate.now());
+                daysSinceLastCheckIn = ChronoUnit.DAYS.between(lastDate, LocalDate.now());
+            }
         }
 
         return new DashboardResponse(
-                streak.getCurrentStreak(),
-                streak.getBestStreak(),
+                stats.getCurrentStreak(),
+                stats.getBestStreak(),
 
                 stats.getTotalCheckIns(),
                 stats.getSuccessCount(),
@@ -101,13 +95,13 @@ public class DashboardService
 
                 unread.getUnreadCount(),
 
-                partnerSummary.getName(),
-                partnerSummary.getCurrentStreak(),
-                partnerSummary.getBestStreak(),
+                partnerName,
+                partnerCurrentStreak,
+                partnerBestStreak,
 
-                partnerLastSeen.getLastSeen(),
-                partnerStatus.isPartnerCheckedInToday(),
-                partnerStatus.getDaysSinceLastCheckIn(),
+                partnerLastSeen,
+                partnerCheckedInToday,
+                daysSinceLastCheckIn,
                 achievementCount
         );
     }

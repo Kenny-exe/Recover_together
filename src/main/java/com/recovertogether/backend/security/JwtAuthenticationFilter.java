@@ -31,7 +31,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
 
         String path = request.getServletPath();
-        if (path.startsWith("/auth"))
+        String uri = request.getRequestURI();
+        if ((path != null && (path.startsWith("/auth") || path.equals("/users/register") || path.equals("/health")))
+                || (uri != null && (uri.startsWith("/auth") || uri.equals("/users/register") || uri.equals("/health"))))
         {
             filterChain.doFilter(request, response);
             return;
@@ -65,8 +67,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
 
-                user.setLastSeen(LocalDateTime.now());
-                userRepository.save(user);
+                LocalDateTime now = LocalDateTime.now();
+                if (user.getLastSeen() == null || user.getLastSeen().isBefore(now.minusMinutes(5))) {
+                    user.setLastSeen(now);
+                    userRepository.save(user);
+                }
 
                 UsernamePasswordAuthenticationToken auth =
                         new UsernamePasswordAuthenticationToken(

@@ -44,7 +44,7 @@ public class MissedCheckInScheduler
 
             boolean senderCheckedIn=dailyCheckInRepository.findByUserAndDate(sender, LocalDate.now()).isPresent();
 
-            boolean receiverCheckedId=dailyCheckInRepository.findByUserAndDate(receiver, LocalDate.now()).isPresent();
+            boolean receiverCheckedIn=dailyCheckInRepository.findByUserAndDate(receiver, LocalDate.now()).isPresent();
 
             if(!senderCheckedIn)
             {
@@ -63,6 +63,29 @@ public class MissedCheckInScheduler
                 {
                     notificationService.createNotification(
                             receiver,
+                            NotificationType.MISSED_CHECKIN,
+                            message
+                    );
+                }
+            }
+
+            if(!receiverCheckedIn)
+            {
+                String message =
+                        receiver.getName() + " missed today's check-in";
+
+                boolean alreadyExists =
+                        notificationRepository
+                                .existsByReceiverAndTypeAndMessage(
+                                        sender,
+                                        NotificationType.MISSED_CHECKIN,
+                                        message
+                                );
+
+                if(!alreadyExists)
+                {
+                    notificationService.createNotification(
+                            sender,
                             NotificationType.MISSED_CHECKIN,
                             message
                     );

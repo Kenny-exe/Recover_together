@@ -27,11 +27,4 @@ public class AuthController
         String token=jwtService.generateToken(request.getEmail());
         return new LoginResponse(token);
     }
-
-    @GetMapping("/test")
-    public String testToken(
-            @RequestParam String token)
-    {
-        return jwtService.extractEmail(token);
-    }
 }

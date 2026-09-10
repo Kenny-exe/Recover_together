@@ -45,6 +45,11 @@ public class AchievementService
             return;
         }
 
+        if ("1 Day Streak".equals(title) && achievementRepository.existsByUserAndTitle(user, "1 Day streak"))
+        {
+            return;
+        }
+
         Achievement achievement =new Achievement();
         achievement.setUser(user);
         achievement.setTitle(title);
@@ -95,7 +100,7 @@ public class AchievementService
     {
         if(streak>=1)
         {
-            awardAchievement(user,"1 Day streak");
+            awardAchievement(user, "1 Day Streak");
         }
         if(streak >= 3)
         {

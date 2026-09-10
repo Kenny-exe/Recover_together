@@ -149,34 +149,43 @@ public class DailyCheckInService
 
         int currentStreak = 0;
 
-        for(int i = checkIns.size()-1; i >= 0; i--)
+        DailyCheckIn latestCheckIn = checkIns.get(checkIns.size() - 1);
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        LocalDate latestDate = latestCheckIn.getDate();
+
+        if (latestCheckIn.getStatus() == CheckInStatus.SUCCESS
+                && (latestDate.equals(today) || latestDate.equals(yesterday)))
         {
-            DailyCheckIn checkIn = checkIns.get(i);
-
-            if(checkIn.getStatus() == CheckInStatus.SUCCESS)
+            for(int i = checkIns.size()-1; i >= 0; i--)
             {
-                if(currentStreak == 0)
-                {
-                    currentStreak = 1;
-                }
-                else
-                {
-                    LocalDate currentDate =
-                            checkIns.get(i+1).getDate();
+                DailyCheckIn checkIn = checkIns.get(i);
 
-                    if(checkIn.getDate().plusDays(1).equals(currentDate))
+                if(checkIn.getStatus() == CheckInStatus.SUCCESS)
+                {
+                    if(currentStreak == 0)
                     {
-                        currentStreak++;
+                        currentStreak = 1;
                     }
                     else
                     {
-                        break;
+                        LocalDate currentDate =
+                                checkIns.get(i+1).getDate();
+
+                        if(checkIn.getDate().plusDays(1).equals(currentDate))
+                        {
+                            currentStreak++;
+                        }
+                        else
+                        {
+                            break;
+                        }
                     }
                 }
-            }
-            else
-            {
-                break;
+                else
+                {
+                    break;
+                }
             }
         }
 

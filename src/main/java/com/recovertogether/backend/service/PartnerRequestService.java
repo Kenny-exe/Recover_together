@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class PartnerRequestService
@@ -31,7 +32,6 @@ public class PartnerRequestService
 
     public void sendRequest(Long receiverId)
     {
-
         User sender=(User) SecurityContextHolder.
                 getContext().
                 getAuthentication().
@@ -47,18 +47,57 @@ public class PartnerRequestService
         User receiver=userRepository.findById(receiverId).orElseThrow(()->
                 new ResponseStatusException(HttpStatus.NOT_FOUND,"User not found"));
 
-        if(partnerRequestRepository.existsBySenderAndReceiverAndStatus(sender,receiver,PartnerRequestStatus.PENDING)
-            || partnerRequestRepository.existsBySenderAndReceiverAndStatus(receiver,sender,PartnerRequestStatus.PENDING))
+        if(hasActivePartner(sender))
         {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Request already exists");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You already have an active partner");
         }
 
-        if(partnerRequestRepository.existsBySenderAndReceiverAndStatus(sender, receiver, PartnerRequestStatus.ACCEPTED)
-            || partnerRequestRepository.existsBySenderAndReceiverAndStatus(receiver, sender, PartnerRequestStatus.ACCEPTED))
+        if(hasActivePartner(receiver))
         {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Users are already partners");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User already has an active partner");
         }
 
+        java.util.Optional<PartnerRequest> outgoing =
+                partnerRequestRepository.findBySenderAndReceiver(sender, receiver);
+
+        if(outgoing.isPresent())
+        {
+            PartnerRequest req = outgoing.get();
+            if(req.getStatus() == PartnerRequestStatus.PENDING)
+            {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request already exists");
+            }
+            if(req.getStatus() == PartnerRequestStatus.ACCEPTED)
+            {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Users are already partners");
+            }
+            if(req.getStatus() == PartnerRequestStatus.REJECTED)
+            {
+                req.setStatus(PartnerRequestStatus.PENDING);
+                partnerRequestRepository.save(req);
+                return;
+            }
+        }
+
+        java.util.Optional<PartnerRequest> incoming =
+                partnerRequestRepository.findBySenderAndReceiver(receiver, sender);
+
+        if(incoming.isPresent())
+        {
+            PartnerRequest req = incoming.get();
+            if(req.getStatus() == PartnerRequestStatus.PENDING)
+            {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request already exists");
+            }
+            if(req.getStatus() == PartnerRequestStatus.ACCEPTED)
+            {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Users are already partners");
+            }
+            if(req.getStatus() == PartnerRequestStatus.REJECTED)
+            {
+                partnerRequestRepository.delete(req);
+            }
+        }
 
         PartnerRequest request = new PartnerRequest();
         request.setSender(sender);
@@ -87,6 +126,17 @@ public class PartnerRequestService
                     HttpStatus.BAD_REQUEST,
                     "Request already processed");
         }
+
+        if(hasActivePartner(currentUser))
+        {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You already have an active partner");
+        }
+
+        if(hasActivePartner(request.getSender()))
+        {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sender already has an active partner");
+        }
+
         request.setStatus(PartnerRequestStatus.ACCEPTED);
         partnerRequestRepository.save(request);
     }
@@ -196,10 +246,28 @@ public class PartnerRequestService
 
     public LastSeenResponse getPartnerLastSeen()
     {
-        PartnerResponse partner = getCurrentPartner();
-        User partnerUser=userRepository.findByEmail(partner.getEmail()).orElseThrow();
+        User partnerUser = getCurrentPartnerUser();
 
         return new LastSeenResponse(partnerUser.getName(), partnerUser.getLastSeen());
+    }
+
+    public Optional<User> findPartnerUser(User currentUser)
+    {
+        Optional<PartnerRequest> asSender =
+                partnerRequestRepository.findFirstBySenderAndStatus(currentUser, PartnerRequestStatus.ACCEPTED);
+        if (asSender.isPresent())
+        {
+            return Optional.ofNullable(asSender.get().getReceiver());
+        }
+
+        Optional<PartnerRequest> asReceiver =
+                partnerRequestRepository.findFirstByReceiverAndStatus(currentUser, PartnerRequestStatus.ACCEPTED);
+        if (asReceiver.isPresent())
+        {
+            return Optional.ofNullable(asReceiver.get().getSender());
+        }
+
+        return Optional.empty();
     }
 
     public User getCurrentPartnerUser()
@@ -210,58 +278,27 @@ public class PartnerRequestService
                         .getAuthentication()
                         .getPrincipal();
 
-        PartnerRequest request =
-                partnerRequestRepository
-                        .findFirstBySenderAndStatus(
-                                currentUser,
-                                PartnerRequestStatus.ACCEPTED)
-                        .orElseGet(() ->
-                                partnerRequestRepository
-                                        .findFirstByReceiverAndStatus(
-                                                currentUser,
-                                                PartnerRequestStatus.ACCEPTED)
-                                        .orElseThrow(() ->
-                                                new ResponseStatusException(
-                                                        HttpStatus.NOT_FOUND,
-                                                        "No partner found"
-                                                ))
-                        );
-
-        if(request.getSender().getId().equals(currentUser.getId()))
-        {
-            return request.getReceiver();
-        }
-
-        return request.getSender();
+        return getPartner(currentUser);
     }
 
     public User getPartner(User currentUser)
     {
-        PartnerRequest request =
-                partnerRequestRepository
-                        .findFirstBySenderAndStatus(
-                                currentUser,
-                                PartnerRequestStatus.ACCEPTED
+        return findPartnerUser(currentUser)
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "No partner found"
                         )
-                        .orElseGet(() ->
-                                partnerRequestRepository
-                                        .findFirstByReceiverAndStatus(
-                                                currentUser,
-                                                PartnerRequestStatus.ACCEPTED
-                                        )
-                                        .orElseThrow(() ->
-                                                new ResponseStatusException(
-                                                        HttpStatus.NOT_FOUND,
-                                                        "No partner found"
-                                                )
-                                        )
-                        );
+                );
+    }
 
-        if(request.getSender().getId().equals(currentUser.getId()))
-        {
-            return request.getReceiver();
-        }
-
-        return request.getSender();
+    public boolean hasActivePartner(User user)
+    {
+        return partnerRequestRepository
+                .findFirstBySenderAndStatus(user, PartnerRequestStatus.ACCEPTED)
+                .isPresent()
+            || partnerRequestRepository
+                .findFirstByReceiverAndStatus(user, PartnerRequestStatus.ACCEPTED)
+                .isPresent();
     }
 }
