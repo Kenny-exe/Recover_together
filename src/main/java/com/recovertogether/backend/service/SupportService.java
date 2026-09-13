@@ -12,7 +12,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import com.recovertogether.backend.enums.NotificationType;
 
+import com.recovertogether.backend.dto.SupportRequestResponse;
+import com.recovertogether.backend.entity.SupportRequest;
+import com.recovertogether.backend.repository.SupportRequestRepository;
+
+import com.recovertogether.backend.enums.AuditAction;
+
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class SupportService
@@ -21,16 +30,25 @@ public class SupportService
     private final MessageRepository messageRepository;
     private final NotificationService notificationService;
     private final PartnerRequestService partnerRequestService;
+    private final SupportRequestRepository supportRequestRepository;
+    private final RecoveryResourceService recoveryResourceService;
+    private final AuditLogService auditLogService;
 
     public SupportService(PartnerRequestRepository partnerRequestRepository,
                           MessageRepository messageRepository,
                           NotificationService notificationService,
-                          PartnerRequestService partnerRequestService)
+                          PartnerRequestService partnerRequestService,
+                          SupportRequestRepository supportRequestRepository,
+                          RecoveryResourceService recoveryResourceService,
+                          AuditLogService auditLogService)
     {
         this.messageRepository=messageRepository;
         this.partnerRequestRepository=partnerRequestRepository;
         this.notificationService=notificationService;
         this.partnerRequestService=partnerRequestService;
+        this.supportRequestRepository=supportRequestRepository;
+        this.recoveryResourceService=recoveryResourceService;
+        this.auditLogService=auditLogService;
     }
 
     public void sendSOS()
@@ -54,6 +72,48 @@ public class SupportService
         messageRepository.save(sosMessage);
 
         notificationService.createNotification(partner,NotificationType.SOS_ALERT, currentUser.getName()+" NEEDS SUPPORT IMMEDIATELY");
+        auditLogService.log(AuditAction.SOS_TRIGGERED, currentUser.getId(), currentUser.getEmail(), null);
+    }
 
+    public SupportRequestResponse requestSupport(String note)
+    {
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Optional<User> partnerOpt = partnerRequestService.findPartnerUser(currentUser);
+
+        SupportRequest supportRequest = new SupportRequest();
+        supportRequest.setUser(currentUser);
+        supportRequest.setNote(note);
+
+        if (partnerOpt.isPresent())
+        {
+            User partner = partnerOpt.get();
+            supportRequest.setPartner(partner);
+            supportRequestRepository.save(supportRequest);
+
+            notificationService.createNotification(
+                    partner,
+                    NotificationType.SUPPORT_REQUEST,
+                    "Your partner may need some support right now."
+            );
+
+            auditLogService.log(AuditAction.SUPPORT_REQUEST_CREATED, currentUser.getId(), currentUser.getEmail(), "Partner paired");
+
+            return new SupportRequestResponse(true, "Support request sent to your partner", Collections.emptyList());
+        }
+        else
+        {
+            supportRequest.setPartner(null);
+            supportRequestRepository.save(supportRequest);
+
+            List<String> fallbacks = recoveryResourceService.getFallbackResources(3);
+
+            auditLogService.log(AuditAction.SUPPORT_REQUEST_CREATED, currentUser.getId(), currentUser.getEmail(), "Unpaired");
+
+            return new SupportRequestResponse(
+                    false,
+                    "No partner is currently paired. Reaching out for support is a courageous step; consider connecting with a trusted person or support group.",
+                    fallbacks != null ? fallbacks : Collections.emptyList()
+            );
+        }
     }
 }

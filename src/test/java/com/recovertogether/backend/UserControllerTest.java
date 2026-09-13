@@ -34,6 +34,9 @@ class UserControllerTest {
     @Mock
     private UserService userService;
 
+    @Mock
+    private com.recovertogether.backend.service.AuditLogService auditLogService;
+
     @InjectMocks
     private UserController userController;
 

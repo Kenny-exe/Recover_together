@@ -11,6 +11,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.recovertogether.backend.enums.AuditAction;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,16 +20,20 @@ public class PartnerRequestService
 {
     public PartnerRequestService(
             PartnerRequestRepository partnerRequestRepository,
-            UserRepository userRepository, DailyCheckInService dailyCheckInService)
+            UserRepository userRepository,
+            DailyCheckInService dailyCheckInService,
+            AuditLogService auditLogService)
             {
                 this.partnerRequestRepository = partnerRequestRepository;
                 this.userRepository = userRepository;
                 this.dailyCheckInService = dailyCheckInService;
+                this.auditLogService = auditLogService;
             }
 
     private final PartnerRequestRepository partnerRequestRepository;
     private final UserRepository userRepository;
     private final DailyCheckInService dailyCheckInService;
+    private final AuditLogService auditLogService;
 
     public void sendRequest(Long receiverId)
     {
@@ -104,6 +109,7 @@ public class PartnerRequestService
         request.setReceiver(receiver);
         request.setStatus(PartnerRequestStatus.PENDING);
         partnerRequestRepository.save(request);
+        auditLogService.log(AuditAction.PARTNER_REQUEST_SENT, sender.getId(), sender.getEmail(), "Target User ID: " + receiverId);
     }
 
     public void acceptRequest(Long requestId)
@@ -139,6 +145,7 @@ public class PartnerRequestService
 
         request.setStatus(PartnerRequestStatus.ACCEPTED);
         partnerRequestRepository.save(request);
+        auditLogService.log(AuditAction.PARTNER_REQUEST_ACCEPTED, currentUser.getId(), currentUser.getEmail(), "Request ID: " + requestId);
     }
 
     public void rejectRequest(Long requestId)
@@ -161,7 +168,7 @@ public class PartnerRequestService
         }
         request.setStatus(PartnerRequestStatus.REJECTED);
         partnerRequestRepository.save(request);
-
+        auditLogService.log(AuditAction.PARTNER_REQUEST_REJECTED, currentUser.getId(), currentUser.getEmail(), "Request ID: " + requestId);
     }
 
     public List<PartnerRequestResponse> getIncomingRequests()
@@ -242,6 +249,7 @@ public class PartnerRequestService
                         );
 
         partnerRequestRepository.delete(request);
+        auditLogService.log(AuditAction.PARTNER_UNPAIRED, currentUser.getId(), currentUser.getEmail(), null);
     }
 
     public LastSeenResponse getPartnerLastSeen()

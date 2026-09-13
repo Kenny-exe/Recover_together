@@ -39,6 +39,9 @@ class PartnerRequestServiceTest {
     @Mock
     private DailyCheckInService dailyCheckInService;
 
+    @Mock
+    private com.recovertogether.backend.service.AuditLogService auditLogService;
+
     @InjectMocks
     private PartnerRequestService partnerRequestService;
 

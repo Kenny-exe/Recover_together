@@ -26,9 +26,10 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 
 ## Schema
 
-- `spring.jpa.hibernate.ddl-auto=update` — schema is auto-managed from entities.
-  There are **no** Flyway/Liquibase migrations; entities in `src/main/java/.../entity`
-  are the source of truth. The DB must be reachable for DDL to run.
+- Version-controlled Flyway database migrations under `src/main/resources/db/migration/`.
+- `spring.flyway.baseline-on-migrate=true` and `spring.flyway.baseline-version=1` protect existing databases.
+- `spring.jpa.hibernate.ddl-auto=validate` — Hibernate validates entity mappings against the database schema at startup without performing automatic DDL changes.
+- The PostgreSQL database must be reachable for migrations and schema validation.
 
 ## Auth
 

@@ -88,6 +88,27 @@ public class DailyCheckInService
                 notificationService.createNotification(partner, NotificationType.PARTNER_RELAPSE,currentUser.getName()+" reported a relapse today");
             }
         }
+        else if(request.getStatus()==CheckInStatus.NEED_SUPPORT)
+        {
+            PartnerRequest partnerRequest=partnerRequestRepository.findFirstBySenderAndStatus(currentUser, PartnerRequestStatus.ACCEPTED).orElseGet(()->
+            partnerRequestRepository.findFirstByReceiverAndStatus(currentUser,PartnerRequestStatus.ACCEPTED).orElse(null));
+
+            if(partnerRequest!=null)
+            {
+                User partner;
+
+                if(partnerRequest.getSender().getId().equals(currentUser.getId()))
+                {
+                    partner=partnerRequest.getReceiver();
+                }
+                else
+                {
+                    partner=partnerRequest.getSender();
+                }
+
+                notificationService.createNotification(partner, NotificationType.SUPPORT_REQUEST,"Your partner may need some support right now.");
+            }
+        }
     }
 
     public List<CheckInResponse> getHistory(int limit)
@@ -122,7 +143,7 @@ public class DailyCheckInService
 
         for(DailyCheckIn checkIn : checkIns)
         {
-            if(checkIn.getStatus() == CheckInStatus.SUCCESS)
+            if(checkIn.getStatus() != CheckInStatus.RELAPSE)
             {
                 if(previousDate == null)
                 {
@@ -154,14 +175,14 @@ public class DailyCheckInService
         LocalDate yesterday = today.minusDays(1);
         LocalDate latestDate = latestCheckIn.getDate();
 
-        if (latestCheckIn.getStatus() == CheckInStatus.SUCCESS
+        if (latestCheckIn.getStatus() != CheckInStatus.RELAPSE
                 && (latestDate.equals(today) || latestDate.equals(yesterday)))
         {
             for(int i = checkIns.size()-1; i >= 0; i--)
             {
                 DailyCheckIn checkIn = checkIns.get(i);
 
-                if(checkIn.getStatus() == CheckInStatus.SUCCESS)
+                if(checkIn.getStatus() != CheckInStatus.RELAPSE)
                 {
                     if(currentStreak == 0)
                     {
@@ -212,8 +233,8 @@ public class DailyCheckInService
         User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         long totalCheckIns=dailyCheckInRepository.countByUser(currentUser);
-        long successCount=dailyCheckInRepository.countByUserAndStatus(currentUser,CheckInStatus.SUCCESS);
         long relapseCount=dailyCheckInRepository.countByUserAndStatus(currentUser,CheckInStatus.RELAPSE);
+        long successCount=totalCheckIns - relapseCount;
 
         double successRate=0.0;
 
@@ -245,19 +266,14 @@ public class DailyCheckInService
                                 weekAgo
                         );
 
-        long successDays =
-                checkIns.stream()
-                        .filter(c ->
-                                c.getStatus() ==
-                                        CheckInStatus.SUCCESS)
-                        .count();
-
         long relapseDays =
                 checkIns.stream()
                         .filter(c ->
                                 c.getStatus() ==
                                         CheckInStatus.RELAPSE)
                         .count();
+
+        long successDays = checkIns.size() - relapseDays;
 
         double successRate = 0.0;
 

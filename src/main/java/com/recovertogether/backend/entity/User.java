@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Size;
 
+import com.recovertogether.backend.enums.ReminderWindow;
 import java.time.LocalDateTime;
 
 @Entity
@@ -35,6 +36,19 @@ public class User {
 
     @Column
     private LocalDateTime lastSeen;
+
+    @Enumerated(EnumType.STRING)
+    @Column
+    private ReminderWindow reminderWindow = ReminderWindow.ANYTIME;
+
+    @Column
+    private int failedLoginAttempts = 0;
+
+    @Column
+    private LocalDateTime lockoutUntil;
+
+    @Column
+    private LocalDateTime tokensInvalidatedBefore;
 
     @PrePersist
     public void prePersist()
@@ -74,4 +88,20 @@ public class User {
     public LocalDateTime getLastSeen() {return lastSeen;}
 
     public void setLastSeen(LocalDateTime lastSeen) {this.lastSeen = lastSeen;}
+
+    public ReminderWindow getReminderWindow() {return reminderWindow;}
+
+    public void setReminderWindow(ReminderWindow reminderWindow) {this.reminderWindow = reminderWindow;}
+
+    public int getFailedLoginAttempts() { return failedLoginAttempts; }
+
+    public void setFailedLoginAttempts(int failedLoginAttempts) { this.failedLoginAttempts = failedLoginAttempts; }
+
+    public LocalDateTime getLockoutUntil() { return lockoutUntil; }
+
+    public void setLockoutUntil(LocalDateTime lockoutUntil) { this.lockoutUntil = lockoutUntil; }
+
+    public LocalDateTime getTokensInvalidatedBefore() { return tokensInvalidatedBefore; }
+
+    public void setTokensInvalidatedBefore(LocalDateTime tokensInvalidatedBefore) { this.tokensInvalidatedBefore = tokensInvalidatedBefore; }
 }

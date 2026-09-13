@@ -3,6 +3,8 @@ import java.util.List;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.repository.UserRepository;
 import com.recovertogether.backend.dto.UserResponse;
+import com.recovertogether.backend.dto.ChangePasswordRequest;
+import java.util.Map;
 import com.recovertogether.backend.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -10,16 +12,21 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.recovertogether.backend.enums.AuditAction;
+import com.recovertogether.backend.service.AuditLogService;
+
 @RestController
 @RequestMapping("/users")
 public class UserController
 {
     private final UserRepository userRepository;
     private final UserService userService;
+    private final AuditLogService auditLogService;
 
-    public UserController(UserRepository userRepository, UserService userService) {
+    public UserController(UserRepository userRepository, UserService userService, AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.userService = userService;
+        this.auditLogService = auditLogService;
     }
 
     //CREATE
@@ -61,6 +68,7 @@ public class UserController
         User user = userRepository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         userRepository.delete(user);
+        auditLogService.log(AuditAction.ACCOUNT_DELETED, currentUser.getId(), currentUser.getEmail(), null);
         return "User deleted successfully";
     }
 
@@ -95,5 +103,13 @@ public class UserController
     {
         User user=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return new UserResponse(user);
+    }
+
+    @PostMapping("/change-password")
+    public Map<String, String> changePassword(@Valid @RequestBody ChangePasswordRequest request)
+    {
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        userService.changePassword(currentUser, request.getCurrentPassword(), request.getNewPassword());
+        return Map.of("message", "Password changed successfully");
     }
 }
