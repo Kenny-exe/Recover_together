@@ -1,26 +1,29 @@
-# Stage 1: Build the application
-FROM maven:3.9-eclipse-temurin-21 AS builder
-WORKDIR /app
+# RecoverTogether backend image.
+# Build:  docker build -t recovertogether-backend .
+# Run:    docker compose up -d --build   (see docker-compose.yml)
+#
+# Multi-stage: a Maven/Temurin-21 builder produces the Spring Boot fat jar, a
+# slim Temurin-21 JRE runtime runs it as a non-root user. The fat jar is kept
+# plain on purpose (no layered extraction) — keep it simple until profiling
+# proves image layer optimization is worth the maintenance.
 
-# Pre-fetch dependencies for better build caching
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /workspace
+
+# Prime the dependency cache first so day-to-day source changes do not
+# re-download the whole dependency tree.
+COPY mvnw ./
+COPY .mvn ./.mvn
 COPY pom.xml ./
-RUN mvn dependency:go-offline -B
+RUN chmod +x mvnw && ./mvnw -B -q dependency:go-offline
 
-# Copy source code and build jar
 COPY src ./src
-RUN mvn clean package -DskipTests -B
+RUN ./mvnw -B -q package -DskipTests
 
-# Stage 2: Minimal runtime image
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:21-jre AS runtime
+RUN useradd --system --no-create-home --uid 1001 appuser
 WORKDIR /app
-
-# Run as non-root user
-RUN addgroup --system spring && adduser --system spring --ingroup spring
-USER spring:spring
-
-# Copy built artifact
-COPY --from=builder /app/target/*.jar app.jar
-
+COPY --from=build /workspace/target/backend-0.0.1-SNAPSHOT.jar app.jar
+USER appuser
 EXPOSE 8080
-
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -1,10 +1,7 @@
+# Keep local build artifacts and machine state out of the image context.
 target/
 .git/
 .idea/
 *.iml
 *.log
-.mvn/
-mvnw
-mvnw.cmd
 HELP.md
-AGENTS.md

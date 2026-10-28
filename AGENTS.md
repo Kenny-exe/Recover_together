@@ -117,6 +117,38 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
   `server.error.include-message=always` — no custom header config was added,
   by design; keep it lean.
 
+## Deployment readiness
+
+- Multi-stage `Dockerfile`: Maven/Temurin-21 build stage
+  (`./mvnw -B -q package -DskipTests`, dependency cache primed first) →
+  slim `eclipse-temurin:21-jre` runtime as non-root `appuser`, `EXPOSE 8080`,
+  `java -jar app.jar`. The fat jar is plain on purpose (no layered
+  extraction); optimize image layers only if profiling demands it.
+- `.dockerignore` keeps `target/`, git, and IDE files out of the image context.
+- CI (`.github/workflows/ci.yml`) runs `./mvnw clean test` against a
+  postgres:18 service with the same credentials dev uses; the test-backed
+  properties file carries the JWT secret and disables rate limiting, so CI
+  needs no secrets of its own.
+- `docker-compose.yml` runs a local prod-like stack: PostgreSQL 18
+  (`db`, host-remapped to 5433 only for tooling) and the backend
+  (`SPRING_PROFILES_ACTIVE=prod`) with `depends_on: db healthy` so the
+  Spring Boot startup race never sees a non-ready database. Compose `:?`
+  enforces `JWT_SECRET`; defaults mirror local dev credentials for dev only.
+  Never commit a real secret — provide overrides via the shell
+  (`APP_PORT`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DOCS_ENABLED`,
+  `RATE_LIMIT_*`, `CORS_ALLOWED_ORIGINS`).
+- postgres:18 images expect their single volume mount at
+  `/var/lib/postgresql` (not `/…/data`, which makes the container exit);
+  don't "fix" that path back.
+- `application-prod.properties` (prod profile) is deliberately tiny: silence
+  SQL logging and set `server.forward-headers-strategy=framework` so TLS
+  proxies' X-Forwarded-* headers are honoured. Anything else prod-specific
+  must be explicit and reviewed — secrets never belong in properties files.
+- Verify deployments with `docker compose up -d --build` plus the API smoke
+  against the compose port, `/v3/api-docs` → 404 (docs off by default in
+  compose), `/health` → 200, and no `Hibernate:` lines in backend logs; then
+  `docker compose down -v` to destroy the stack and its data volume.
+
 ## Password reset
 
 - Public endpoints: `POST /auth/forgot-password` (`email`) and

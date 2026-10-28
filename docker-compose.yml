@@ -1,45 +1,63 @@
+# Local production-like stack: PostgreSQL 18 + the app built from this repo.
+#
+#   docker compose up -d --build          # needs JWT_SECRET in the environment
+#   APP_PORT=8082 JWT_SECRET=... docker compose up -d --build
+#   docker compose down -v
+#
+# JWT_SECRET is mandatory (the app refuses to boot without it, and compose
+# enforces it too). Never commit a real secret — values come from the shell
+# environment or an untracked .env file. Defaults mirror local development
+# credentials (postgres/1234) and are for dev only.
+
+name: recovertogether
+
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: recovertogether-db
-    restart: unless-stopped
+  db:
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: recovertogether
-      POSTGRES_USER: postgres
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-1234}
+    # Exposed on the host only for local tooling (e.g. smoke-test data
+    # cleanup); the backend reaches the database over the compose network.
+    ports:
+      - "${DB_PORT:-5433}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # postgres:18 keeps its data under /var/lib/postgresql/data but expects
+      # the single mount at /var/lib/postgresql (pg_upgrade-friendly layout).
+      - db-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d recovertogether"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d recovertogether"]
       interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - recovertogether-network
+      timeout: 3s
+      retries: 10
 
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: recovertogether-backend
-    restart: unless-stopped
+    build: .
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
-    ports:
-      - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/recovertogether
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-1234}
-      JWT_SECRET: ${JWT_SECRET}
-    networks:
-      - recovertogether-network
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://db:5432/recovertogether
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-1234}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@recovertogether.app}
+      MAIL_LOG_RESET_CODES: "false"
+      # Sensible production defaults: API docs off, rate limits on.
+      DOCS_ENABLED: ${DOCS_ENABLED:-false}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-30}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8080'"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 40s
 
 volumes:
-  postgres_data:
-
-networks:
-  recovertogether-network:
-    driver: bridge
+  db-data:
