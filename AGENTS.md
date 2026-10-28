@@ -33,9 +33,16 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 - `spring.flyway.baseline-on-migrate=true` and `spring.flyway.baseline-version=1` protect existing databases.
 - `spring.jpa.hibernate.ddl-auto=validate` — Hibernate validates entity mappings against the database schema at startup without performing automatic DDL changes.
 - The PostgreSQL database must be reachable for migrations and schema validation.
-- Entity changes require a new migration (current head: `V3__add_user_devices.sql`);
-  enum-typed columns carry CHECK constraints that must be kept in sync with
-  their `enums/` values (see V2/V3 for the pattern).
+- Entity changes require a new migration (current head:
+  `V4__enforce_cascading_user_foreign_keys.sql`); enum-typed columns carry
+  CHECK constraints that must be kept in sync with their `enums/` values (see
+  V2/V3 for the pattern).
+- Databases created by Hibernate before Flyway was enabled were baselined at
+  V1, so V1's `ON DELETE CASCADE` / `SET NULL` policies were missing on their
+  generated foreign keys. V4 drops those constraints dynamically by table and
+  recreates them with stable names and the V1 policies; keep this drift in
+  mind when adding user-owned tables (a new FK must cascade or account
+  deletion will fail with 409 Conflict).
 
 ## Privacy invariants (mobile)
 
