@@ -36,9 +36,11 @@ public class MessageController
 
     @GetMapping("/conversation/{partnerId}")
     public List<ChatMessageResponse> getConversation(
-            @PathVariable Long partnerId, @RequestParam(defaultValue = "50") int limit)
+            @PathVariable Long partnerId,
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(required = false) Long beforeId)
     {
-        return messageService.getConversation(partnerId,limit);
+        return messageService.getConversation(partnerId, limit, beforeId);
     }
 
     @GetMapping("/unread-count")

@@ -1,6 +1,6 @@
 package com.recovertogether.backend.service;
 
-import com.recovertogether.backend.dto.CheckInResponse;
+import com.recovertogether.backend.dto.PartnerCheckInResponse;
 import com.recovertogether.backend.entity.DailyCheckIn;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.repository.DailyCheckInRepository;
@@ -26,7 +26,7 @@ public class PartnerCheckInService
         this.partnerRequestService = partnerRequestService;
     }
 
-    public CheckInResponse getPartnerLatestCheckIn()
+    public PartnerCheckInResponse getPartnerLatestCheckIn()
     {
         User partnerUser =
                 partnerRequestService.getCurrentPartnerUser();
@@ -40,9 +40,9 @@ public class PartnerCheckInService
                                         "Partner has no check-ins"
                                 ));
 
-        return new CheckInResponse(checkIn);
+        return new PartnerCheckInResponse(checkIn);
     }
-    public List<CheckInResponse> getPartnerHistory(int limit)
+    public List<PartnerCheckInResponse> getPartnerHistory(int limit)
     {
         User partnerUser =
                 partnerRequestService.getCurrentPartnerUser();
@@ -51,7 +51,7 @@ public class PartnerCheckInService
                 .findByUserOrderByDateDesc(partnerUser)
                 .stream()
                 .limit(limit)
-                .map(CheckInResponse::new)
+                .map(PartnerCheckInResponse::new)
                 .toList();
     }
 

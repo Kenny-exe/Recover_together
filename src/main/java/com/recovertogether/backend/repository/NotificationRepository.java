@@ -10,6 +10,8 @@ import java.util.Optional;
 public interface NotificationRepository extends JpaRepository<Notification, Long>
 {
     List<Notification> findByReceiverOrderByCreatedAtDesc(User receiver);
+
+    List<Notification> findByReceiverAndIdLessThanOrderByCreatedAtDesc(User receiver, Long beforeId);
     long countByReceiverAndReadFalse(User receiver);
     Optional<Notification> findByIdAndReceiver(Long id, User receiver);
     boolean existsByReceiverAndTypeAndMessage(User receiver, NotificationType type, String message);

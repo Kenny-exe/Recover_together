@@ -1,5 +1,6 @@
 package com.recovertogether.backend.service;
 
+import com.recovertogether.backend.dto.RegisterRequest;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.enums.AuditAction;
 import com.recovertogether.backend.repository.UserRepository;
@@ -37,6 +38,25 @@ public class UserService {
                        PasswordEncoder passwordEncoder,
                        AuditLogService auditLogService) {
         this(userRepository, passwordEncoder, auditLogService, null);
+    }
+
+    public User register(RegisterRequest request) {
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already registered");
+        }
+
+        User user = new User();
+        user.setName(request.getName().trim());
+        user.setEmail(normalizedEmail);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setFailedLoginAttempts(0);
+        user.setLockoutUntil(null);
+        user.setTokensInvalidatedBefore(null);
+
+        User saved = userRepository.save(user);
+        auditLogService.log(AuditAction.USER_REGISTERED, saved.getId(), saved.getEmail(), null);
+        return saved;
     }
 
     public User register(User user) {

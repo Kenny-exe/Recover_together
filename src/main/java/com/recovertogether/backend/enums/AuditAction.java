@@ -13,5 +13,6 @@ public enum AuditAction {
     SOS_TRIGGERED,
     LOGOUT,
     PASSWORD_CHANGED,
-    ACCOUNT_LOCKED
+    ACCOUNT_LOCKED,
+    PROFILE_UPDATED
 }

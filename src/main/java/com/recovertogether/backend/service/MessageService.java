@@ -85,7 +85,7 @@ public class MessageService
                 NotificationType.NEW_MESSAGE, sender.getName() + " sent you a message"
         );
     }
-    public List<ChatMessageResponse> getConversation(Long partnerId, int limit)
+    public List<ChatMessageResponse> getConversation(Long partnerId, int limit, Long beforeId)
     {
         User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
@@ -128,6 +128,14 @@ public class MessageService
                 )
         );
 
+        // Cursor pagination: only show messages strictly older than beforeId.
+        if (beforeId != null)
+        {
+            sentMessages = sentMessages.stream()
+                    .filter(message -> message.getId() != null && message.getId() < beforeId)
+                    .toList();
+        }
+
         for(Message message:receivedMessages)
         {
             message.setRead(true);
@@ -147,6 +155,11 @@ public class MessageService
                 .stream()
                 .map(ChatMessageResponse::new)
                 .toList();
+    }
+
+    public List<ChatMessageResponse> getConversation(Long partnerId, int limit)
+    {
+        return getConversation(partnerId, limit, null);
     }
 
     public UnreadCountResponse getUnreadCount()

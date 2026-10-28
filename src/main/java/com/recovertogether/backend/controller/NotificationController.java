@@ -20,9 +20,11 @@ public class NotificationController
     }
 
     @GetMapping
-    public List<NotificationResponse> getNotifications(@RequestParam(defaultValue = "20")int limit)
+    public List<NotificationResponse> getNotifications(
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) Long beforeId)
     {
-        return notificationService.getNotifications(limit);
+        return notificationService.getNotifications(limit, beforeId);
     }
 
     @GetMapping("/unread-count")

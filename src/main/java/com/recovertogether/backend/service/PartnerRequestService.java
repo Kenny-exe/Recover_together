@@ -9,6 +9,7 @@ import com.recovertogether.backend.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.recovertogether.backend.enums.AuditAction;
@@ -35,6 +36,7 @@ public class PartnerRequestService
     private final DailyCheckInService dailyCheckInService;
     private final AuditLogService auditLogService;
 
+    @Transactional
     public void sendRequest(Long receiverId)
     {
         User sender=(User) SecurityContextHolder.
@@ -112,6 +114,7 @@ public class PartnerRequestService
         auditLogService.log(AuditAction.PARTNER_REQUEST_SENT, sender.getId(), sender.getEmail(), "Target User ID: " + receiverId);
     }
 
+    @Transactional
     public void acceptRequest(Long requestId)
     {
         User currentUser=(User) SecurityContextHolder.
@@ -148,6 +151,7 @@ public class PartnerRequestService
         auditLogService.log(AuditAction.PARTNER_REQUEST_ACCEPTED, currentUser.getId(), currentUser.getEmail(), "Request ID: " + requestId);
     }
 
+    @Transactional
     public void rejectRequest(Long requestId)
     {
         User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -237,6 +241,7 @@ public class PartnerRequestService
         );
     }
 
+    @Transactional
     public void unpair()
     {
         User currentUser =

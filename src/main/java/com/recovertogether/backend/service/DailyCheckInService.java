@@ -12,14 +12,13 @@ import com.recovertogether.backend.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.recovertogether.backend.enums.NotificationType;
 import java.time.LocalDate;
 import com.recovertogether.backend.dto.WeeklyReportResponse;
 
 import java.util.List;
-
-import java.time.LocalDate;
 
 @Service
 public class DailyCheckInService
@@ -43,6 +42,7 @@ public class DailyCheckInService
         this.achievementService=achievementService;
     }
 
+    @Transactional
     public void submitCheckIn(CheckInRequest request)
     {
         User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();

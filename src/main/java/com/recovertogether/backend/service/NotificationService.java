@@ -6,7 +6,7 @@ import com.recovertogether.backend.entity.Notification;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.enums.NotificationType;
 import com.recovertogether.backend.repository.NotificationRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -17,21 +17,42 @@ import java.util.List;
 public class NotificationService
 {
     private final NotificationRepository notificationRepository;
+    private final PushNotificationService pushNotificationService;
 
-    public NotificationService(NotificationRepository notificationRepository)
+    public NotificationService(NotificationRepository notificationRepository,
+                               PushNotificationService pushNotificationService)
     {
-        this.notificationRepository=notificationRepository;
+        this.notificationRepository = notificationRepository;
+        this.pushNotificationService = pushNotificationService;
+    }
+
+    private static final int MAX_LIMIT = 100;
+
+    public List<NotificationResponse> getNotifications(int limit, Long beforeId)
+    {
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (limit < 1)
+        {limit = 1;}
+
+        else if (limit > MAX_LIMIT)
+        {limit = MAX_LIMIT;}
+
+        List<Notification> notifications;
+        if (beforeId != null)
+        {
+            notifications = notificationRepository.findByReceiverAndIdLessThanOrderByCreatedAtDesc(currentUser, beforeId);
+        }
+        else
+        {
+            notifications = notificationRepository.findByReceiverOrderByCreatedAtDesc(currentUser);
+        }
+
+        return notifications.stream().limit(limit).map(NotificationResponse::new).toList();
     }
 
     public List<NotificationResponse> getNotifications(int limit)
     {
-        User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if(limit < 1)
-        {limit = 1;}
-
-        else if(limit > 100)
-        {limit = 100;}
-        return notificationRepository.findByReceiverOrderByCreatedAtDesc(currentUser).stream().limit(limit).map(NotificationResponse::new).toList();
+        return getNotifications(limit, null);
     }
 
     public UnreadCountResponse getUnreadCount()
@@ -64,6 +85,36 @@ public class NotificationService
         notification.setType(type);
         notification.setMessage(message);
         notificationRepository.save(notification);
+
+        // Best-effort push to the receiver's registered devices; the push
+        // service swallows all failures so this never blocks the workflow.
+        try
+        {
+            pushNotificationService.push(receiver, titleFor(type), message);
+        }
+        catch (Exception e)
+        {
+            // Never break the caller's transaction because of push.
+        }
+    }
+
+    public static String titleFor(NotificationType type)
+    {
+        if (type == null)
+        {
+            return "RecoverTogether";
+        }
+        return switch (type)
+        {
+            case NEW_MESSAGE -> "New message";
+            case SOS_ALERT -> "SOS alert";
+            case PARTNER_RELAPSE -> "Partner update";
+            case MISSED_CHECKIN -> "Missed check-in";
+            case ACHIEVEMENT_UNLOCKED -> "Achievement unlocked";
+            case PARTNER_ACHIEVEMENT -> "Partner achievement";
+            case DAILY_CHECKIN_REMINDER -> "Check-in reminder";
+            case SUPPORT_REQUEST -> "Support request";
+        };
     }
 
     @Transactional
@@ -78,6 +129,7 @@ public class NotificationService
         }
     }
 
+    @Transactional
     public void markAllAsRead()
     {
         User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();

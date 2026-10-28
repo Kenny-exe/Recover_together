@@ -1,6 +1,6 @@
 package com.recovertogether.backend.controller;
 
-import com.recovertogether.backend.dto.CheckInResponse;
+import com.recovertogether.backend.dto.PartnerCheckInResponse;
 import com.recovertogether.backend.dto.PartnerStatusResponse;
 import com.recovertogether.backend.service.PartnerCheckInService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,13 +23,13 @@ public class PartnerCheckInController
     }
 
     @GetMapping("/latest")
-    public CheckInResponse getPartnerLatestCheckIn()
+    public PartnerCheckInResponse getPartnerLatestCheckIn()
     {
         return partnerCheckInService.getPartnerLatestCheckIn();
     }
 
     @GetMapping("/history")
-    public List<CheckInResponse> getPartnerHistory(
+    public List<PartnerCheckInResponse> getPartnerHistory(
             @RequestParam(defaultValue = "30") int limit)
     {
         return partnerCheckInService.getPartnerHistory(limit);
