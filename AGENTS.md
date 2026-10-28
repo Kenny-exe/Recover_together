@@ -34,7 +34,7 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 - `spring.jpa.hibernate.ddl-auto=validate` — Hibernate validates entity mappings against the database schema at startup without performing automatic DDL changes.
 - The PostgreSQL database must be reachable for migrations and schema validation.
 - Entity changes require a new migration (current head:
-  `V8__add_account_deletion_denied_audit.sql`); enum-typed columns carry
+  `V9__add_message_conversation_indexes.sql`); enum-typed columns carry
   CHECK constraints that must be kept in sync with their `enums/` values (see
   V2/V3 for the pattern).
 - Databases created by Hibernate before Flyway was enabled were baselined at
@@ -147,6 +147,24 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 - `SecurityConfig` permits `ASYNC` and `ERROR` dispatcher types so the async
   completion of the SSE stream is not re-authorized. `JwtAuthenticationFilter`
   (a `OncePerRequestFilter`) skips ASYNC dispatches by default.
+
+## Chat messages
+
+- `GET /messages/conversation/{partnerId}?limit=&beforeId=` pages the thread at
+  the database level: one cursor query on `id` (strictly older than
+  `beforeId`, which is exclusive) fetched newest-window-first and reversed, so
+  responses stay chronological. `limit` defaults to 50 and is clamped to
+  1..200 (`limit < 1` → 400); `beforeId` is the smallest id of the previous
+  page when paging backwards. `MessageRepository.findConversationPage` is
+  backed by V9's composite `(sender_id, receiver_id, id)` indexes in both
+  directions — never load the whole thread into memory again.
+- Opening the thread marks the reader's unread messages from that partner
+  read with one bulk update (`markReceivedFromSenderAsRead`, issued before the
+  page fetch inside a `@Transactional` service method).
+  `GET /messages/unread-count` counts unread received messages; denied or
+  rejected conversation requests never mark anything read.
+- Sends are partner-only (403 otherwise), trimmed, and capped at 1000 chars;
+  each send persists, derives a `NEW_MESSAGE` notification, and publishes SSE.
 
 ## Timezone / local-day semantics
 

@@ -9,15 +9,22 @@ import com.recovertogether.backend.enums.PartnerRequestStatus;
 import com.recovertogether.backend.repository.MessageRepository;
 import com.recovertogether.backend.repository.PartnerRequestRepository;
 import com.recovertogether.backend.repository.UserRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class MessageService
 {
+    private static final int MAX_CONVERSATION_PAGE_SIZE = 200;
+
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final PartnerRequestRepository partnerRequestRepository;
@@ -103,8 +110,27 @@ public class MessageService
             // Realtime delivery is best-effort; the message is already stored.
         }
     }
+    /**
+     * Returns a bounded page of the partner thread, oldest-to-newest.
+     *
+     * <p>Pagination is done by the database: a single cursor query on
+     * {@code id} (strictly older than {@code beforeId}, newest window first)
+     * is fetched in descending order and reversed for the response. The
+     * caller's unread messages from this partner are marked read in the same
+     * transaction with one bulk update.
+     *
+     * @param limit    page size, clamped to 1..200
+     * @param beforeId exclusive cursor; null returns the latest window
+     */
+    @Transactional
     public List<ChatMessageResponse> getConversation(Long partnerId, int limit, Long beforeId)
     {
+        if (limit <= 0)
+        {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Limit must be at least 1");
+        }
+        int pageSize = Math.min(limit, MAX_CONVERSATION_PAGE_SIZE);
+
         User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         User partner=userRepository.findById(partnerId).orElseThrow(()->
@@ -124,52 +150,20 @@ public class MessageService
             );
         }
 
-        List<Message> sentMessages =
-                messageRepository
-                        .findBySenderAndReceiverOrderByCreatedAtAsc(
-                                currentUser,
-                                partner
-                        );
+        // Opening the thread reads the conversation: the reader's unread
+        // messages from this partner become read in one bulk statement.
+        messageRepository.markReceivedFromSenderAsRead(currentUser, partner);
 
-        List<Message> receivedMessages =
-                messageRepository
-                        .findByReceiverAndSenderOrderByCreatedAtAsc(
-                                currentUser,
-                                partner
-                        );
+        List<Message> window = messageRepository.findConversationPage(
+                currentUser,
+                partner,
+                beforeId == null ? Long.MAX_VALUE : beforeId,
+                PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "id")));
 
-        sentMessages.addAll(receivedMessages);
+        List<Message> chronological = new ArrayList<>(window);
+        java.util.Collections.reverse(chronological);
 
-        sentMessages.sort(
-                java.util.Comparator.comparing(
-                        Message::getCreatedAt
-                )
-        );
-
-        // Cursor pagination: only show messages strictly older than beforeId.
-        if (beforeId != null)
-        {
-            sentMessages = sentMessages.stream()
-                    .filter(message -> message.getId() != null && message.getId() < beforeId)
-                    .toList();
-        }
-
-        for(Message message:receivedMessages)
-        {
-            message.setRead(true);
-        }
-        messageRepository.saveAll(receivedMessages);
-
-        if(sentMessages.size() > limit)
-        {
-            sentMessages =
-                    sentMessages.subList(
-                            sentMessages.size() - limit,
-                            sentMessages.size()
-                    );
-        }
-
-        return sentMessages
+        return chronological
                 .stream()
                 .map(ChatMessageResponse::new)
                 .toList();
