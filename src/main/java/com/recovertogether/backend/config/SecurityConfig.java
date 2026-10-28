@@ -37,6 +37,8 @@ public class SecurityConfig
                                 .requestMatchers(
                                         "/auth/login",
                                         "/auth/refresh",
+                                        "/auth/forgot-password",
+                                        "/auth/reset-password",
                                         "/users/register",
                                         "/health",
                                         "/swagger-ui/**",

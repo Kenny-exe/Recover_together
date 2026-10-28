@@ -14,5 +14,6 @@ public enum AuditAction {
     LOGOUT,
     PASSWORD_CHANGED,
     ACCOUNT_LOCKED,
-    PROFILE_UPDATED
+    PROFILE_UPDATED,
+    PASSWORD_RESET
 }

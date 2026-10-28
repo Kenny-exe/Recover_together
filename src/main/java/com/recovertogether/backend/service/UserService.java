@@ -76,9 +76,13 @@ public class UserService {
     }
 
     public User authenticate(String email, String password) {
-        Optional<User> userOpt = userRepository.findByEmail(email);
+        String normalizedEmail = email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
+        Optional<User> userOpt = normalizedEmail == null || normalizedEmail.isBlank()
+                ? Optional.empty()
+                : userRepository.findByEmail(normalizedEmail);
+
         if (userOpt.isEmpty()) {
-            auditLogService.log(AuditAction.LOGIN_FAILURE, null, email, "User not found");
+            auditLogService.log(AuditAction.LOGIN_FAILURE, null, normalizedEmail, "User not found");
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
 

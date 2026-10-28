@@ -34,7 +34,7 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 - `spring.jpa.hibernate.ddl-auto=validate` — Hibernate validates entity mappings against the database schema at startup without performing automatic DDL changes.
 - The PostgreSQL database must be reachable for migrations and schema validation.
 - Entity changes require a new migration (current head:
-  `V4__enforce_cascading_user_foreign_keys.sql`); enum-typed columns carry
+  `V5__add_password_reset.sql`); enum-typed columns carry
   CHECK constraints that must be kept in sync with their `enums/` values (see
   V2/V3 for the pattern).
 - Databases created by Hibernate before Flyway was enabled were baselined at
@@ -69,9 +69,30 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
   provides an Authorization header.
 - Passwords are BCrypt-encoded (`PasswordEncoder` bean in `SecurityConfig`).
 - Login is protected by account lockout (5 failed attempts → 15 min lock).
+- Emails are normalized (trim + lowercase) on registration, login, and password
+  reset, so casing or padding never blocks an otherwise valid login.
 - `/auth/refresh` rotates refresh tokens; `/auth/logout` revokes the presented
   refresh token. Password change invalidates prior tokens and revokes refresh
   tokens of the user.
+
+## Password reset
+
+- Public endpoints: `POST /auth/forgot-password` (`email`) and
+  `POST /auth/reset-password` (`token`, `newPassword`).
+- Both responses are enumeration-safe: unknown and known emails receive the
+  same generic message. Requests are throttled per user (60s cooldown, max 3
+  per hour) without revealing whether the account exists.
+- Codes are 256-bit URL-safe random values, valid for 30 minutes, stored only
+  as SHA-256 hashes in `password_reset_tokens`, and consumed exactly once via
+  an atomic update. Only the most recently issued code is valid.
+- A successful reset updates the password, clears failed-attempt/lockout state,
+  invalidates access tokens (`tokensInvalidatedBefore`), revokes all refresh
+  tokens, and writes a `PASSWORD_RESET` audit entry.
+- `MailService`/`SmtpMailService`: SMTP is used when `spring.mail.host` is set;
+  otherwise delivery is a log-only no-op. Configure `app.mail.from`
+  (`MAIL_FROM`) and optionally `app.mail.log-reset-codes=true`
+  (`MAIL_LOG_RESET_CODES`) for local testing only — never in production.
+  Mail failures are swallowed so they cannot break the reset workflow.
 
 ## Mobile push notifications
 
@@ -123,7 +144,8 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 - `service/` — business logic including `User`, `Jwt`, `DailyCheckIn`,
   `PartnerRequest`, `PartnerCheckIn`, `Notification`, `Message`, `Achievement`,
   `MissedCheckInScheduler`, `Dashboard`, `Support`, `Device`,
-  `RealtimeEventService` (SSE), `PushNotificationService`/`FcmPushService`.
+  `RealtimeEventService` (SSE), `PushNotificationService`/`FcmPushService`,
+  `PasswordResetService`, `MailService`/`SmtpMailService`.
 - `repository/` — Spring Data JPA repositories.
 - `entity/` — JPA entities (source of truth for the schema).
 - `dto/` — request/response DTOs.

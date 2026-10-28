@@ -511,6 +511,18 @@ class AuthenticationHardeningTest {
         verify(userRepository).save(alice);
     }
 
+    @Test
+    @DisplayName("Login Normalization: mixed-case and padded email authenticates against the stored lowercase email")
+    void testLoginNormalizesEmail() {
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(alice));
+
+        User authenticated = userService.authenticate("  Alice@Example.COM  ", "Password123!");
+
+        assertSame(alice, authenticated);
+        verify(userRepository).findByEmail("alice@example.com");
+        verify(userRepository).save(alice);
+    }
+
     // =========================================================================
     // 6. AUDIT RESILIENCE TESTS
     // =========================================================================
