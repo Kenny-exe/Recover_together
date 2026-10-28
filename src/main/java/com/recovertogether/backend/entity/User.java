@@ -41,6 +41,11 @@ public class User {
     @Column
     private ReminderWindow reminderWindow = ReminderWindow.ANYTIME;
 
+    public static final String DEFAULT_TIMEZONE = "UTC";
+
+    @Column(nullable = false, length = 64)
+    private String timezone = DEFAULT_TIMEZONE;
+
     @Column
     private int failedLoginAttempts = 0;
 
@@ -92,6 +97,10 @@ public class User {
     public ReminderWindow getReminderWindow() {return reminderWindow;}
 
     public void setReminderWindow(ReminderWindow reminderWindow) {this.reminderWindow = reminderWindow;}
+
+    public String getTimezone() {return timezone;}
+
+    public void setTimezone(String timezone) {this.timezone = timezone;}
 
     public int getFailedLoginAttempts() { return failedLoginAttempts; }
 

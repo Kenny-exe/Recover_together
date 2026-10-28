@@ -46,8 +46,9 @@ public class DailyCheckInService
     public void submitCheckIn(CheckInRequest request)
     {
         User currentUser=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        LocalDate today = UserTimeZone.today(currentUser);
 
-        if(dailyCheckInRepository.findByUserAndDate(currentUser, LocalDate.now()).isPresent())
+        if(dailyCheckInRepository.findByUserAndDate(currentUser, today).isPresent())
         {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -58,7 +59,7 @@ public class DailyCheckInService
         DailyCheckIn checkIn = new DailyCheckIn();
 
         checkIn.setUser(currentUser);
-        checkIn.setDate(LocalDate.now());
+        checkIn.setDate(today);
         checkIn.setStatus(request.getStatus());
         checkIn.setNote(request.getNote());
 
@@ -171,7 +172,7 @@ public class DailyCheckInService
         int currentStreak = 0;
 
         DailyCheckIn latestCheckIn = checkIns.get(checkIns.size() - 1);
-        LocalDate today = LocalDate.now();
+        LocalDate today = UserTimeZone.today(user);
         LocalDate yesterday = today.minusDays(1);
         LocalDate latestDate = latestCheckIn.getDate();
 
@@ -257,7 +258,7 @@ public class DailyCheckInService
                         .getPrincipal();
 
         LocalDate weekAgo =
-                LocalDate.now().minusDays(7);
+                UserTimeZone.today(currentUser).minusDays(7);
 
         List<DailyCheckIn> checkIns =
                 dailyCheckInRepository

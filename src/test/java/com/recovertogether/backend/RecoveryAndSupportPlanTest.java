@@ -24,6 +24,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -110,11 +111,13 @@ class RecoveryAndSupportPlanTest {
         userA = new User();
         userA.setName("Alice");
         userA.setEmail("alice@example.com");
+        userA.setTimezone(ZoneId.systemDefault().getId());
         setId(userA, 1L);
 
         userB = new User();
         userB.setName("Bob");
         userB.setEmail("bob@example.com");
+        userB.setTimezone(ZoneId.systemDefault().getId());
         setId(userB, 2L);
 
         SecurityContextHolder.getContext().setAuthentication(

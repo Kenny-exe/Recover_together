@@ -20,12 +20,20 @@ public class RegisterRequest {
     @Size(min = 8, max = 128, message = "Password must be between 8 and 128 characters")
     private String password;
 
+    @Size(max = 64, message = "Timezone must be at most 64 characters")
+    private String timezone;
+
     public RegisterRequest() {}
 
     public RegisterRequest(String name, String email, String password) {
+        this(name, email, password, null);
+    }
+
+    public RegisterRequest(String name, String email, String password, String timezone) {
         this.name = name;
         this.email = email;
         this.password = password;
+        this.timezone = timezone;
     }
 
     public String getName() {
@@ -50,5 +58,13 @@ public class RegisterRequest {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
     }
 }

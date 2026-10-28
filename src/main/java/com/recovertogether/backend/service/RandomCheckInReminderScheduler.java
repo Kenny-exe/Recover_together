@@ -5,9 +5,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
-
 @Service
 public class RandomCheckInReminderScheduler {
 
@@ -19,11 +16,14 @@ public class RandomCheckInReminderScheduler {
         this.checkInReminderService = checkInReminderService;
     }
 
-    @Scheduled(cron = "${checkin.reminder.cron:0 */15 8-22 * * *}")
+    /**
+     * Runs every 15 minutes around the clock. Each user's reminder is evaluated
+     * against that user's own local time and reminder window, so server-local
+     * 08:00-22:00 no longer applies globally.
+     */
+    @Scheduled(cron = "${checkin.reminder.cron:0 */15 * * * *}")
     public void runReminderCheck() {
-        LocalDate today = LocalDate.now();
-        LocalTime now = LocalTime.now();
-        log.debug("Running random check-in reminder scheduler for date: {}, time: {}", today, now);
-        checkInReminderService.processReminders(today, now);
+        log.debug("Running per-user check-in reminder scheduler");
+        checkInReminderService.processReminders();
     }
 }

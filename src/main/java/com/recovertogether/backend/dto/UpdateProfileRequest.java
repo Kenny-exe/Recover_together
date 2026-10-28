@@ -18,11 +18,19 @@ public class UpdateProfileRequest {
     @Email(message = "Invalid email format")
     private String email;
 
+    @Size(max = 64, message = "Timezone must be at most 64 characters")
+    private String timezone;
+
     public UpdateProfileRequest() {}
 
     public UpdateProfileRequest(String name, String email) {
+        this(name, email, null);
+    }
+
+    public UpdateProfileRequest(String name, String email, String timezone) {
         this.name = name;
         this.email = email;
+        this.timezone = timezone;
     }
 
     public String getName() {
@@ -39,5 +47,13 @@ public class UpdateProfileRequest {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
     }
 }

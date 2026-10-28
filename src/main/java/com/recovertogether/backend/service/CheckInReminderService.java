@@ -56,8 +56,8 @@ public class CheckInReminderService {
         user.setReminderWindow(newWindow);
         User savedUser = userRepository.save(user);
 
-        LocalDate today = LocalDate.now();
-        LocalTime now = LocalTime.now();
+        LocalDate today = UserTimeZone.today(savedUser);
+        LocalTime now = UserTimeZone.now(savedUser);
 
         Optional<CheckInReminderSchedule> existingOpt = reminderScheduleRepository.findByUserAndDate(savedUser, today);
 
@@ -83,27 +83,30 @@ public class CheckInReminderService {
         return new ReminderWindowResponse(savedUser.getReminderWindow());
     }
 
-    public void processReminders(LocalDate today, LocalTime currentTime) {
+    public void processReminders() {
         List<User> users = userRepository.findAll();
 
         for (User user : users) {
             try {
-                generateScheduleForUser(user, today, currentTime);
+                processRemindersForUser(user, UserTimeZone.today(user), UserTimeZone.now(user));
             } catch (Exception e) {
-                log.error("Failed to generate schedule for user {}: {}", user.getId(), e.getMessage());
+                log.error("Failed to process reminders for user {}: {}", user.getId(), e.getMessage());
             }
         }
+    }
 
-        List<CheckInReminderSchedule> dueSchedules =
-                reminderScheduleRepository.findByDateAndSentFalseAndScheduledTimeLessThanEqual(today, currentTime);
+    /**
+     * Generates and dispatches today's reminder for one user using that user's
+     * local date and time. Kept separate from {@link #processReminders()} so
+     * scheduler behavior is deterministic in tests.
+     */
+    public void processRemindersForUser(User user, LocalDate today, LocalTime currentTime) {
+        generateScheduleForUser(user, today, currentTime);
 
-        for (CheckInReminderSchedule schedule : dueSchedules) {
-            try {
-                processDueSchedule(schedule, today);
-            } catch (Exception e) {
-                log.error("Failed to process due reminder schedule {}: {}", schedule.getId(), e.getMessage());
-            }
-        }
+        reminderScheduleRepository.findByUserAndDate(user, today)
+                .filter(schedule -> !schedule.isSent())
+                .filter(schedule -> !schedule.getScheduledTime().isAfter(currentTime))
+                .ifPresent(schedule -> processDueSchedule(schedule, today));
     }
 
     public void generateScheduleForUser(User user, LocalDate date, LocalTime currentTime) {

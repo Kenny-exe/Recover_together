@@ -63,8 +63,9 @@ public class PartnerCheckInService
                 new ResponseStatusException(HttpStatus.NOT_FOUND,"Partner has not check-ins"));
 
         LocalDate lastDate=latestCheckIn.getDate();
-        boolean checkedInToday=lastDate.equals(LocalDate.now());
-        long daysSince=ChronoUnit.DAYS.between(lastDate,LocalDate.now());
+        LocalDate today=UserTimeZone.today(partnerUser);
+        boolean checkedInToday=lastDate.equals(today);
+        long daysSince=ChronoUnit.DAYS.between(lastDate,today);
         return new PartnerStatusResponse(checkedInToday, daysSince, lastDate);
     }
 }

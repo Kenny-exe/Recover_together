@@ -19,7 +19,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -28,6 +27,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -71,12 +71,14 @@ class CheckInReminderTest {
         userA.setName("Alice");
         userA.setEmail("alice@example.com");
         userA.setReminderWindow(ReminderWindow.MORNING);
+        userA.setTimezone(ZoneId.systemDefault().getId());
         setId(userA, 1L);
 
         userB = new User();
         userB.setName("Bob");
         userB.setEmail("bob@example.com");
         userB.setReminderWindow(ReminderWindow.AFTERNOON);
+        userB.setTimezone(ZoneId.systemDefault().getId());
         setId(userB, 2L);
 
         SecurityContextHolder.getContext().setAuthentication(
@@ -102,24 +104,22 @@ class CheckInReminderTest {
     @Test
     @DisplayName("1. Reminder is generated when user has not checked in and time is reached")
     void testReminderGeneratedWhenNotCheckedIn() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.of(2026, 10, 28);
         LocalTime scheduledTime = LocalTime.of(9, 30);
         LocalTime currentTime = LocalTime.of(9, 30);
 
         CheckInReminderSchedule schedule = new CheckInReminderSchedule(userA, today, scheduledTime);
 
-        when(userRepository.findAll()).thenReturn(List.of(userA));
         when(reminderScheduleRepository.existsByUserAndDate(userA, today)).thenReturn(true);
-        when(reminderScheduleRepository.findByDateAndSentFalseAndScheduledTimeLessThanEqual(today, currentTime))
-                .thenReturn(List.of(schedule));
+        when(reminderScheduleRepository.findByUserAndDate(userA, today)).thenReturn(Optional.of(schedule));
         when(dailyCheckInRepository.findByUserAndDate(userA, today)).thenReturn(Optional.empty());
 
-        reminderService.processReminders(today, currentTime);
+        reminderService.processRemindersForUser(userA, today, currentTime);
 
         verify(notificationService).createNotification(
                 userA,
                 NotificationType.DAILY_CHECKIN_REMINDER,
-                "How are you doing today? Take a moment to check in."
+                CheckInReminderService.GENTLE_REMINDER_MESSAGE
         );
         assertTrue(schedule.isSent());
         verify(reminderScheduleRepository).save(schedule);
@@ -128,19 +128,17 @@ class CheckInReminderTest {
     @Test
     @DisplayName("2. Reminder is NOT generated when user has already checked in before scheduled time")
     void testReminderNotGeneratedWhenAlreadyCheckedIn() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.of(2026, 10, 28);
         LocalTime scheduledTime = LocalTime.of(10, 0);
         LocalTime currentTime = LocalTime.of(10, 15);
 
         CheckInReminderSchedule schedule = new CheckInReminderSchedule(userA, today, scheduledTime);
 
-        when(userRepository.findAll()).thenReturn(List.of(userA));
         when(reminderScheduleRepository.existsByUserAndDate(userA, today)).thenReturn(true);
-        when(reminderScheduleRepository.findByDateAndSentFalseAndScheduledTimeLessThanEqual(today, currentTime))
-                .thenReturn(List.of(schedule));
+        when(reminderScheduleRepository.findByUserAndDate(userA, today)).thenReturn(Optional.of(schedule));
         when(dailyCheckInRepository.findByUserAndDate(userA, today)).thenReturn(Optional.of(new DailyCheckIn()));
 
-        reminderService.processReminders(today, currentTime);
+        reminderService.processRemindersForUser(userA, today, currentTime);
 
         verifyNoInteractions(notificationService);
         assertTrue(schedule.isSent());
@@ -150,61 +148,71 @@ class CheckInReminderTest {
     @Test
     @DisplayName("3. Only one reminder is generated per user per day even if scheduler runs repeatedly")
     void testSingleReminderPerDayOnRepeatedSchedulerRuns() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.of(2026, 10, 28);
         LocalTime scheduledTime = LocalTime.of(9, 0);
-        LocalTime firstRunTime = LocalTime.of(9, 15);
-        LocalTime secondRunTime = LocalTime.of(9, 30);
 
         CheckInReminderSchedule schedule = new CheckInReminderSchedule(userA, today, scheduledTime);
 
-        when(userRepository.findAll()).thenReturn(List.of(userA));
         when(reminderScheduleRepository.existsByUserAndDate(userA, today)).thenReturn(true);
-        when(reminderScheduleRepository.findByDateAndSentFalseAndScheduledTimeLessThanEqual(today, firstRunTime))
-                .thenReturn(List.of(schedule));
+        when(reminderScheduleRepository.findByUserAndDate(userA, today)).thenReturn(Optional.of(schedule));
         when(dailyCheckInRepository.findByUserAndDate(userA, today)).thenReturn(Optional.empty());
 
         // First run: dispatches reminder and marks schedule sent
-        reminderService.processReminders(today, firstRunTime);
+        reminderService.processRemindersForUser(userA, today, LocalTime.of(9, 15));
         verify(notificationService, times(1)).createNotification(eq(userA), any(), any());
         assertTrue(schedule.isSent());
 
-        // Second run: query for sent=false returns empty list
-        when(reminderScheduleRepository.findByDateAndSentFalseAndScheduledTimeLessThanEqual(today, secondRunTime))
-                .thenReturn(Collections.emptyList());
+        // Second run: the in-memory schedule is already sent, so it is filtered out
+        reminderService.processRemindersForUser(userA, today, LocalTime.of(9, 30));
 
-        reminderService.processReminders(today, secondRunTime);
-
-        // Still exactly 1 notification sent
         verify(notificationService, times(1)).createNotification(eq(userA), any(), any());
     }
 
     @Test
     @DisplayName("4. Different users receive reminders independently according to their own schedule")
     void testDifferentUsersReceiveRemindersIndependently() {
-        LocalDate today = LocalDate.now();
-        LocalTime userATime = LocalTime.of(9, 0);
-        LocalTime userBTime = LocalTime.of(14, 0);
+        LocalDate today = LocalDate.of(2026, 10, 28);
+        CheckInReminderSchedule scheduleA =
+                new CheckInReminderSchedule(userA, today, LocalTime.of(9, 0));
+        CheckInReminderSchedule scheduleB =
+                new CheckInReminderSchedule(userB, today, LocalTime.of(14, 0));
 
-        CheckInReminderSchedule scheduleA = new CheckInReminderSchedule(userA, today, userATime);
-
-        when(userRepository.findAll()).thenReturn(List.of(userA, userB));
         when(reminderScheduleRepository.existsByUserAndDate(userA, today)).thenReturn(true);
         when(reminderScheduleRepository.existsByUserAndDate(userB, today)).thenReturn(true);
-
-        // At 09:30: userA is due, userB is not due yet
-        LocalTime morningCheck = LocalTime.of(9, 30);
-        when(reminderScheduleRepository.findByDateAndSentFalseAndScheduledTimeLessThanEqual(today, morningCheck))
-                .thenReturn(List.of(scheduleA));
+        when(reminderScheduleRepository.findByUserAndDate(userA, today)).thenReturn(Optional.of(scheduleA));
+        when(reminderScheduleRepository.findByUserAndDate(userB, today)).thenReturn(Optional.of(scheduleB));
         when(dailyCheckInRepository.findByUserAndDate(userA, today)).thenReturn(Optional.empty());
 
-        reminderService.processReminders(today, morningCheck);
+        // At 09:30: userA is due, userB is not due yet
+        reminderService.processRemindersForUser(userA, today, LocalTime.of(9, 30));
+        reminderService.processRemindersForUser(userB, today, LocalTime.of(9, 30));
 
         verify(notificationService).createNotification(eq(userA), eq(NotificationType.DAILY_CHECKIN_REMINDER), anyString());
         verify(notificationService, never()).createNotification(eq(userB), any(), any());
+        assertTrue(scheduleA.isSent());
+        assertFalse(scheduleB.isSent());
     }
 
     @Test
-    @DisplayName("5. Configured time windows boundaries are strictly respected")
+    @DisplayName("5. A future schedule is not dispatched and is left unsent")
+    void testFutureReminderIsNotDispatched() {
+        LocalDate today = LocalDate.of(2026, 10, 28);
+        CheckInReminderSchedule schedule =
+                new CheckInReminderSchedule(userA, today, LocalTime.of(18, 0));
+
+        when(reminderScheduleRepository.existsByUserAndDate(userA, today)).thenReturn(true);
+        when(reminderScheduleRepository.findByUserAndDate(userA, today)).thenReturn(Optional.of(schedule));
+
+        reminderService.processRemindersForUser(userA, today, LocalTime.of(9, 0));
+
+        verifyNoInteractions(notificationService);
+        verifyNoInteractions(dailyCheckInRepository);
+        assertFalse(schedule.isSent());
+        verify(reminderScheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("6. Configured time windows boundaries are strictly respected")
     void testConfiguredTimeWindowsRespected() {
         ReminderTimeGenerator defaultGen = ReminderTimeGenerator.defaultRandom();
 
@@ -219,7 +227,7 @@ class CheckInReminderTest {
     }
 
     @Test
-    @DisplayName("6. No reminder is scheduled if current time is past window end time")
+    @DisplayName("7. No reminder is scheduled if current time is past window end time")
     void testNoReminderWhenWindowHasPassed() {
         ReminderTimeGenerator defaultGen = ReminderTimeGenerator.defaultRandom();
 
@@ -233,7 +241,7 @@ class CheckInReminderTest {
     }
 
     @Test
-    @DisplayName("7. Changing reminder window BEFORE reminder is sent regenerates today's schedule")
+    @DisplayName("8. Changing reminder window BEFORE reminder is sent regenerates today's schedule")
     void testChangeWindowBeforeSentUpdatesSchedule() {
         LocalDate today = LocalDate.now();
         LocalTime oldScheduled = LocalTime.of(10, 0);
@@ -245,7 +253,8 @@ class CheckInReminderTest {
         reminderService.setTimeGenerator((window, earliest) -> LocalTime.of(19, 30));
 
         when(userRepository.save(userA)).thenReturn(userA);
-        when(reminderScheduleRepository.findByUserAndDate(userA, today)).thenReturn(Optional.of(schedule));
+        when(reminderScheduleRepository.findByUserAndDate(eq(userA), any(LocalDate.class)))
+                .thenReturn(Optional.of(schedule));
 
         ReminderWindowResponse response = reminderService.updateReminderWindow(userA, ReminderWindow.EVENING);
 
@@ -256,7 +265,7 @@ class CheckInReminderTest {
     }
 
     @Test
-    @DisplayName("8. Changing reminder window AFTER reminder was sent does NOT modify today's schedule")
+    @DisplayName("9. Changing reminder window AFTER reminder was sent does NOT modify today's schedule")
     void testChangeWindowAfterSentDoesNotCreateAnotherToday() {
         LocalDate today = LocalDate.now();
         LocalTime oldScheduled = LocalTime.of(9, 30);
@@ -265,7 +274,8 @@ class CheckInReminderTest {
         schedule.setSent(true); // Already sent
 
         when(userRepository.save(userA)).thenReturn(userA);
-        when(reminderScheduleRepository.findByUserAndDate(userA, today)).thenReturn(Optional.of(schedule));
+        when(reminderScheduleRepository.findByUserAndDate(eq(userA), any(LocalDate.class)))
+                .thenReturn(Optional.of(schedule));
 
         ReminderWindowResponse response = reminderService.updateReminderWindow(userA, ReminderWindow.EVENING);
 
@@ -277,9 +287,9 @@ class CheckInReminderTest {
     }
 
     @Test
-    @DisplayName("9. Concurrency race condition on schedule creation is handled gracefully")
+    @DisplayName("10. Concurrency race condition on schedule creation is handled gracefully")
     void testConcurrentScheduleCreationHandledGracefully() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.of(2026, 10, 28);
         LocalTime now = LocalTime.of(9, 0);
 
         when(reminderScheduleRepository.existsByUserAndDate(userA, today)).thenReturn(false);
@@ -290,7 +300,7 @@ class CheckInReminderTest {
     }
 
     @Test
-    @DisplayName("10. Controller GET /checkin/reminder-window returns authenticated user preference")
+    @DisplayName("11. Controller GET /checkin/reminder-window returns authenticated user preference")
     void testControllerGetReminderWindow() {
         ReminderWindowResponse res = reminderController.getReminderWindow();
 
@@ -301,10 +311,11 @@ class CheckInReminderTest {
     }
 
     @Test
-    @DisplayName("11. Controller PUT /checkin/reminder-window updates authenticated user preference")
+    @DisplayName("12. Controller PUT /checkin/reminder-window updates authenticated user preference")
     void testControllerUpdateReminderWindow() {
         when(userRepository.save(userA)).thenReturn(userA);
-        when(reminderScheduleRepository.findByUserAndDate(eq(userA), any())).thenReturn(Optional.empty());
+        when(reminderScheduleRepository.findByUserAndDate(eq(userA), any(LocalDate.class)))
+                .thenReturn(Optional.empty());
 
         ReminderWindowRequest request = new ReminderWindowRequest(ReminderWindow.AFTERNOON);
         ReminderWindowResponse res = reminderController.updateReminderWindow(request);

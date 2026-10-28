@@ -9,12 +9,20 @@ import com.recovertogether.backend.repository.NotificationRepository;
 import com.recovertogether.backend.repository.PartnerRequestRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 @Service
 public class MissedCheckInScheduler
 {
+    /** Local hour after which a missing check-in is reported to the partner. */
+    private static final int MISSED_CHECKIN_HOUR = 21;
+
     private final PartnerRequestRepository partnerRequestRepository;
     private final DailyCheckInRepository dailyCheckInRepository;
     private final NotificationService notificationService;
@@ -32,65 +40,71 @@ public class MissedCheckInScheduler
         this.notificationRepository=notificationRepository;
     }
 
-    @Scheduled(cron = "0 0 21 * * *")
+    /**
+     * Runs every 15 minutes so every IANA offset (including :30 and :45
+     * zones) passes through 21:00 local. Duplicate protection is per user-local
+     * day, so repeated runs cannot send the same alert twice.
+     */
+    @Scheduled(cron = "${checkin.missed.cron:0 */15 * * * *}")
     public void checkMissedCheckIns()
+    {
+        checkMissedCheckIns(ZonedDateTime.now(ZoneOffset.UTC));
+    }
+
+    public void checkMissedCheckIns(ZonedDateTime now)
     {
         List<PartnerRequest> partnerships=partnerRequestRepository.findByStatus(PartnerRequestStatus.ACCEPTED);
 
         for(PartnerRequest partnership: partnerships)
         {
-            User sender=partnership.getSender();
-            User receiver=partnership.getReceiver();
+            evaluateMissedCheckIn(partnership.getSender(), partnership.getReceiver(), now);
+            evaluateMissedCheckIn(partnership.getReceiver(), partnership.getSender(), now);
+        }
+    }
 
-            boolean senderCheckedIn=dailyCheckInRepository.findByUserAndDate(sender, LocalDate.now()).isPresent();
+    private void evaluateMissedCheckIn(User user, User partner, ZonedDateTime now)
+    {
+        ZonedDateTime userNow = now.withZoneSameInstant(UserTimeZone.of(user));
 
-            boolean receiverCheckedIn=dailyCheckInRepository.findByUserAndDate(receiver, LocalDate.now()).isPresent();
+        if(userNow.getHour() != MISSED_CHECKIN_HOUR)
+        {
+            return;
+        }
 
-            if(!senderCheckedIn)
-            {
-                String message =
-                        sender.getName() + " missed today's check-in";
+        LocalDate userToday = userNow.toLocalDate();
 
-                boolean alreadyExists =
-                        notificationRepository
-                                .existsByReceiverAndTypeAndMessage(
-                                        receiver,
-                                        NotificationType.MISSED_CHECKIN,
-                                        message
-                                );
+        if(dailyCheckInRepository.findByUserAndDate(user, userToday).isPresent())
+        {
+            return;
+        }
 
-                if(!alreadyExists)
-                {
-                    notificationService.createNotification(
-                            receiver,
-                            NotificationType.MISSED_CHECKIN,
-                            message
-                    );
-                }
-            }
+        String message = user.getName() + " missed today's check-in";
 
-            if(!receiverCheckedIn)
-            {
-                String message =
-                        receiver.getName() + " missed today's check-in";
+        // Notification timestamps are server-local. Convert the start of the
+        // user's local day into the server zone so an alert from a previous
+        // local day never suppresses today's.
+        LocalDateTime startOfUserDayOnServer =
+                userToday.atStartOfDay(userNow.getZone())
+                        .withZoneSameInstant(ZoneId.systemDefault())
+                        .toLocalDateTime()
+                        .minusSeconds(1);
 
-                boolean alreadyExists =
-                        notificationRepository
-                                .existsByReceiverAndTypeAndMessage(
-                                        sender,
-                                        NotificationType.MISSED_CHECKIN,
-                                        message
-                                );
+        boolean alreadyExists =
+                notificationRepository
+                        .existsByReceiverAndTypeAndMessageAndCreatedAtAfter(
+                                partner,
+                                NotificationType.MISSED_CHECKIN,
+                                message,
+                                startOfUserDayOnServer
+                        );
 
-                if(!alreadyExists)
-                {
-                    notificationService.createNotification(
-                            sender,
-                            NotificationType.MISSED_CHECKIN,
-                            message
-                    );
-                }
-            }
+        if(!alreadyExists)
+        {
+            notificationService.createNotification(
+                    partner,
+                    NotificationType.MISSED_CHECKIN,
+                    message
+            );
         }
     }
 }

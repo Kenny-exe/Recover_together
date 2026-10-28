@@ -50,6 +50,7 @@ public class UserService {
         user.setName(request.getName().trim());
         user.setEmail(normalizedEmail);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setTimezone(UserTimeZone.normalizeOrDefault(request.getTimezone()));
         user.setFailedLoginAttempts(0);
         user.setLockoutUntil(null);
         user.setTokensInvalidatedBefore(null);
@@ -62,6 +63,10 @@ public class UserService {
     public User register(User user) {
         if (userRepository.existsByEmail(user.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already registered");
+        }
+
+        if (user.getTimezone() == null || user.getTimezone().isBlank()) {
+            user.setTimezone(User.DEFAULT_TIMEZONE);
         }
 
         user.setPassword(passwordEncoder.encode(user.getPassword()));

@@ -271,6 +271,51 @@ class UserControllerTest {
     }
 
     @Test
+    @DisplayName("PUT /users/me updates and canonicalises the user's timezone")
+    void testUpdateMeTimezone() {
+        UpdateProfileRequest request = new UpdateProfileRequest(
+                "Alice", "alice@example.com", " Asia/Kolkata ");
+
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserResponse response = userController.updateCurrentUser(request);
+
+        assertEquals("Asia/Kolkata", response.getTimezone());
+        assertEquals("Asia/Kolkata", currentUser.getTimezone());
+        verify(userRepository).save(currentUser);
+    }
+
+    @Test
+    @DisplayName("PUT /users/me without a timezone preserves the existing timezone")
+    void testUpdateMePreservesTimezoneWhenOmitted() {
+        currentUser.setTimezone("America/New_York");
+        UpdateProfileRequest request = new UpdateProfileRequest("Alice", "alice@example.com");
+
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserResponse response = userController.updateCurrentUser(request);
+
+        assertEquals("America/New_York", response.getTimezone());
+        assertEquals("America/New_York", currentUser.getTimezone());
+    }
+
+    @Test
+    @DisplayName("PUT /users/me with an invalid timezone throws 400 and does not save")
+    void testUpdateMeInvalidTimezone() {
+        UpdateProfileRequest request = new UpdateProfileRequest(
+                "Alice", "alice@example.com", "Invalid/Zone");
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> userController.updateCurrentUser(request)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Invalid timezone"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("DELETE /users/me deletes the current account and returns JSON message")
     void testDeleteMe() {
         Map<String, String> result = userController.deleteCurrentUser();

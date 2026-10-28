@@ -34,7 +34,7 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 - `spring.jpa.hibernate.ddl-auto=validate` — Hibernate validates entity mappings against the database schema at startup without performing automatic DDL changes.
 - The PostgreSQL database must be reachable for migrations and schema validation.
 - Entity changes require a new migration (current head:
-  `V5__add_password_reset.sql`); enum-typed columns carry
+  `V6__add_user_timezone.sql`); enum-typed columns carry
   CHECK constraints that must be kept in sync with their `enums/` values (see
   V2/V3 for the pattern).
 - Databases created by Hibernate before Flyway was enabled were baselined at
@@ -46,9 +46,10 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 
 ## Privacy invariants (mobile)
 
-- Registration binds only `RegisterRequest` (name/email/password); profile
-  updates bind only `UpdateProfileRequest` (name/email) — user/entity fields
-  such as lockout or token-invalidation state are never client-bindable.
+- Registration binds only `RegisterRequest` (name/email/password/timezone);
+  profile updates bind only `UpdateProfileRequest` (name/email/timezone) —
+  user/entity fields such as lockout or token-invalidation state are never
+  client-bindable.
 - `UserResponse` and `DeviceResponse` never expose secrets (password hashes,
   security fields, raw push tokens — devices expose a masked preview only).
 - Partner check-in views use `PartnerCheckInResponse` (id/date/status/created),
@@ -129,21 +130,50 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
   completion of the SSE stream is not re-authorized. `JwtAuthenticationFilter`
   (a `OncePerRequestFilter`) skips ASYNC dispatches by default.
 
+## Timezone / local-day semantics
+
+- Every user has an IANA `timezone` (`users.timezone`, default `UTC`,
+  max 64 chars). Registration and profile updates accept an optional
+  `timezone`; omitted values keep the existing/default zone. Invalid IANA ids
+  are rejected with 400.
+- `UserTimeZone` is the single source of truth: reads fall back to UTC for
+  missing or invalid stored values so schedulers never crash; writes use
+  `normalize`/`normalizeOrDefault`.
+- Check-ins, streaks, weekly reports, partner `checkedInToday`/`daysSince`, and
+  reminder windows all use the relevant user's local day. A check-in belongs
+  to the local date at submission time. Partner status is measured on the
+  partner's clock, not the viewer's.
+- Notification timestamps remain server-local; the missed-check-in duplicate
+  guard converts the user's local day start into server time.
+
 ## Scheduling
 
 - `BackendApplication` is annotated with `@EnableScheduling`.
-- `MissedCheckInScheduler.checkMissedCheckIns()` runs daily at 21:00 server time.
-- It evaluates accepted partner relationships and creates missed-check-in
-  notifications when a partner has not completed their check-in.
-- Scheduler behavior should be verified through testing, especially for both
-  directions of a partner relationship.
+- `MissedCheckInScheduler.checkMissedCheckIns()` runs every 15 minutes server
+  time. It converts the instant into each user's timezone and only evaluates
+  users whose local hour is 21 (covers :00/:15/:30/:45 offsets).
+- It evaluates accepted partner relationships in both directions and creates
+  missed-check-in notifications when a user has not checked in on their local
+  day. Duplicate protection is per user-local day via notification
+  `createdAt`, so repeated runs cannot re-alert and a new day is never
+  suppressed by an old alert.
+- `RandomCheckInReminderScheduler.runReminderCheck()` also runs every 15
+  minutes around the clock; `CheckInReminderService.processReminders()`
+  generates/evaluates each user's reminder in their own local time and
+  `ReminderWindow` (MORNING/AFTERNOON/EVENING/ANYTIME). One schedule per user
+  per local date (`uk_reminder_schedule_user_date`); changing the window after
+  today's reminder was sent takes effect on a future day.
+- Scheduler behavior is verified with fixed `ZonedDateTime`/local times in
+  tests, including both relationship directions, per-user zones, 21:00 gating,
+  and per-local-day duplicate cutoffs.
 
 ## Code layout
 
 - `controller/` — REST controllers (request mapping prefixes per class).
 - `service/` — business logic including `User`, `Jwt`, `DailyCheckIn`,
   `PartnerRequest`, `PartnerCheckIn`, `Notification`, `Message`, `Achievement`,
-  `MissedCheckInScheduler`, `Dashboard`, `Support`, `Device`,
+  `CheckInReminderService`, `RandomCheckInReminderScheduler`,
+  `MissedCheckInScheduler`, `Dashboard`, `Support`, `Device`, `UserTimeZone`,
   `RealtimeEventService` (SSE), `PushNotificationService`/`FcmPushService`,
   `PasswordResetService`, `MailService`/`SmtpMailService`.
 - `repository/` — Spring Data JPA repositories.

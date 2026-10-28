@@ -79,8 +79,9 @@ public class DashboardService
             if (latestCheckIn.isPresent())
             {
                 LocalDate lastDate = latestCheckIn.get().getDate();
-                partnerCheckedInToday = lastDate.equals(LocalDate.now());
-                daysSinceLastCheckIn = ChronoUnit.DAYS.between(lastDate, LocalDate.now());
+                LocalDate partnerToday = UserTimeZone.today(partner);
+                partnerCheckedInToday = lastDate.equals(partnerToday);
+                daysSinceLastCheckIn = ChronoUnit.DAYS.between(lastDate, partnerToday);
             }
         }
 

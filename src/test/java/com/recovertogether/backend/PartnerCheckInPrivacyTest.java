@@ -24,6 +24,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -56,6 +57,7 @@ class PartnerCheckInPrivacyTest {
         partner = new User();
         partner.setName("Bob");
         partner.setEmail("bob@example.com");
+        partner.setTimezone(ZoneId.systemDefault().getId());
         setId(partner, 2L);
     }
 

@@ -86,10 +86,10 @@ class UserRegistrationAndPrivacyTest {
     }
 
     @Test
-    @DisplayName("REGISTRATION DTO: RegisterRequest only accepts name, email, password (no security fields)")
+    @DisplayName("REGISTRATION DTO: RegisterRequest only accepts name, email, password, timezone (no security fields)")
     void testRegisterRequestFieldsRestricted() {
         Field[] fields = RegisterRequest.class.getDeclaredFields();
-        assertEquals(3, fields.length, "RegisterRequest must strictly contain only 3 fields");
+        assertEquals(4, fields.length, "RegisterRequest must strictly contain only 4 fields");
 
         boolean hasFailedLoginAttempts = Arrays.stream(fields).anyMatch(f -> f.getName().equals("failedLoginAttempts"));
         boolean hasLockoutUntil = Arrays.stream(fields).anyMatch(f -> f.getName().equals("lockoutUntil"));
@@ -149,10 +149,53 @@ class UserRegistrationAndPrivacyTest {
         assertNull(savedUser.getLockoutUntil(), "New user must have null lockoutUntil");
         assertNull(savedUser.getTokensInvalidatedBefore(), "New user must have null tokensInvalidatedBefore");
         assertEquals(ReminderWindow.ANYTIME, savedUser.getReminderWindow());
+        assertEquals("UTC", savedUser.getTimezone(), "New user without a timezone defaults to UTC");
         assertEquals("$2a$10$encodedHash1234567890", savedUser.getPassword());
         assertNotNull(savedUser.getCreatedAt());
 
         verify(auditLogService).log(eq(AuditAction.USER_REGISTERED), eq(2L), eq("bob@example.com"), isNull());
+    }
+
+    @Test
+    @DisplayName("REGISTRATION: Explicit IANA timezone is canonicalised and persisted")
+    void testRegisterWithTimezone() {
+        RegisterRequest request = new RegisterRequest(
+                "Bob", "bob@example.com", "SecretPass123!", " Asia/Kolkata ");
+
+        when(userRepository.existsByEmail("bob@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("SecretPass123!")).thenReturn("$2a$10$encodedHash1234567890");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            u.prePersist();
+            setId(u, 3L);
+            return u;
+        });
+
+        UserResponse response = userController.register(request);
+
+        assertEquals("Asia/Kolkata", response.getTimezone());
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertEquals("Asia/Kolkata", captor.getValue().getTimezone());
+    }
+
+    @Test
+    @DisplayName("REGISTRATION: Invalid timezone throws 400 Bad Request and does not save")
+    void testRegisterWithInvalidTimezoneThrows() {
+        RegisterRequest request = new RegisterRequest(
+                "Bob", "bob@example.com", "SecretPass123!", "Mars/Olympus_Mons");
+
+        when(userRepository.existsByEmail("bob@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("SecretPass123!")).thenReturn("$2a$10$encodedHash1234567890");
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> userController.register(request)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Invalid timezone"));
+        verify(userRepository, never()).save(any());
     }
 
     @Test

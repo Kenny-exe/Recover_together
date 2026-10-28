@@ -8,6 +8,7 @@ import com.recovertogether.backend.dto.ChangePasswordRequest;
 import com.recovertogether.backend.dto.UpdateProfileRequest;
 import java.util.Map;
 import com.recovertogether.backend.service.UserService;
+import com.recovertogether.backend.service.UserTimeZone;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -127,6 +128,7 @@ public class UserController
     private UserResponse applyProfileUpdate(User target, UpdateProfileRequest request)
     {
         String normalizedEmail = request.getEmail().trim().toLowerCase();
+        String normalizedTimezone = UserTimeZone.normalize(request.getTimezone());
 
         if (!target.getEmail().equalsIgnoreCase(normalizedEmail)
                 && userRepository.existsByEmail(normalizedEmail))
@@ -136,6 +138,10 @@ public class UserController
 
         target.setName(request.getName().trim());
         target.setEmail(normalizedEmail);
+
+        if (normalizedTimezone != null) {
+            target.setTimezone(normalizedTimezone);
+        }
 
         User saved = userRepository.save(target);
         auditLogService.log(AuditAction.PROFILE_UPDATED, saved.getId(), saved.getEmail(), null);

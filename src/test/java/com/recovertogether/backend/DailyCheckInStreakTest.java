@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -53,6 +54,7 @@ class DailyCheckInStreakTest {
         testUser = new User();
         testUser.setName("Alice");
         testUser.setEmail("alice@example.com");
+        testUser.setTimezone(ZoneId.systemDefault().getId());
     }
 
     private DailyCheckIn createCheckIn(LocalDate date, CheckInStatus status) {

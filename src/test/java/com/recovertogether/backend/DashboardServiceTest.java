@@ -26,6 +26,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Optional;
 
@@ -62,11 +63,13 @@ class DashboardServiceTest {
         setUserId(currentUser, 1L);
         currentUser.setName("Alice");
         currentUser.setEmail("alice@test.com");
+        currentUser.setTimezone(ZoneId.systemDefault().getId());
 
         partnerUser = new User();
         setUserId(partnerUser, 2L);
         partnerUser.setName("Bob");
         partnerUser.setEmail("bob@test.com");
+        partnerUser.setTimezone(ZoneId.systemDefault().getId());
         partnerUser.setLastSeen(LocalDateTime.of(2026, 9, 10, 12, 0));
 
         SecurityContextHolder.getContext().setAuthentication(
