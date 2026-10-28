@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 
 import com.recovertogether.backend.enums.ReminderWindow;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "users")
@@ -54,6 +55,20 @@ public class User {
 
     @Column
     private LocalDateTime tokensInvalidatedBefore;
+
+    /** Global mobile-push switch. In-app notifications are unaffected. */
+    @Column(nullable = false)
+    private boolean pushNotificationsEnabled = true;
+
+    /** Quiet hours suppress non-SOS push in the user's own timezone. */
+    @Column(nullable = false)
+    private boolean quietHoursEnabled = false;
+
+    @Column
+    private LocalTime quietHoursStart;
+
+    @Column
+    private LocalTime quietHoursEnd;
 
     @PrePersist
     public void prePersist()
@@ -113,4 +128,20 @@ public class User {
     public LocalDateTime getTokensInvalidatedBefore() { return tokensInvalidatedBefore; }
 
     public void setTokensInvalidatedBefore(LocalDateTime tokensInvalidatedBefore) { this.tokensInvalidatedBefore = tokensInvalidatedBefore; }
+
+    public boolean isPushNotificationsEnabled() {return pushNotificationsEnabled;}
+
+    public void setPushNotificationsEnabled(boolean pushNotificationsEnabled) {this.pushNotificationsEnabled = pushNotificationsEnabled;}
+
+    public boolean isQuietHoursEnabled() {return quietHoursEnabled;}
+
+    public void setQuietHoursEnabled(boolean quietHoursEnabled) {this.quietHoursEnabled = quietHoursEnabled;}
+
+    public LocalTime getQuietHoursStart() {return quietHoursStart;}
+
+    public void setQuietHoursStart(LocalTime quietHoursStart) {this.quietHoursStart = quietHoursStart;}
+
+    public LocalTime getQuietHoursEnd() {return quietHoursEnd;}
+
+    public void setQuietHoursEnd(LocalTime quietHoursEnd) {this.quietHoursEnd = quietHoursEnd;}
 }

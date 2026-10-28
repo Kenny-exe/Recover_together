@@ -6,7 +6,8 @@ import com.recovertogether.backend.entity.Notification;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.enums.NotificationType;
 import com.recovertogether.backend.repository.NotificationRepository;
-import org.springframework.transaction.annotation.Transactional;import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,14 +19,17 @@ public class NotificationService
     private final NotificationRepository notificationRepository;
     private final PushNotificationService pushNotificationService;
     private final RealtimeEventService realtimeEventService;
+    private final NotificationPreferenceService notificationPreferenceService;
 
     public NotificationService(NotificationRepository notificationRepository,
                                PushNotificationService pushNotificationService,
-                               RealtimeEventService realtimeEventService)
+                               RealtimeEventService realtimeEventService,
+                               NotificationPreferenceService notificationPreferenceService)
     {
         this.notificationRepository = notificationRepository;
         this.pushNotificationService = pushNotificationService;
         this.realtimeEventService = realtimeEventService;
+        this.notificationPreferenceService = notificationPreferenceService;
     }
 
     private static final int MAX_LIMIT = 100;
@@ -105,11 +109,28 @@ public class NotificationService
             data.putAll(extraData);
         }
 
+        // Push honours the receiver's preferences and quiet hours (SOS always
+        // bypasses them). Preference evaluation must never break the primary
+        // workflow, so failures fall back to the previous "push anyway"
+        // behaviour and the in-app notification is always kept.
+        boolean pushAllowed = true;
+        try
+        {
+            pushAllowed = notificationPreferenceService.shouldPush(receiver, type);
+        }
+        catch (Exception e)
+        {
+            // Preferences are advisory here; do not block notification creation.
+        }
+
         // Best-effort push to the receiver's registered devices; the push
         // service swallows all failures so this never blocks the workflow.
         try
         {
-            pushNotificationService.push(receiver, titleFor(type), message, data);
+            if (pushAllowed)
+            {
+                pushNotificationService.push(receiver, titleFor(type), message, data);
+            }
         }
         catch (Exception e)
         {

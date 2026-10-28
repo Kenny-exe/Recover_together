@@ -34,7 +34,7 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 - `spring.jpa.hibernate.ddl-auto=validate` — Hibernate validates entity mappings against the database schema at startup without performing automatic DDL changes.
 - The PostgreSQL database must be reachable for migrations and schema validation.
 - Entity changes require a new migration (current head:
-  `V6__add_user_timezone.sql`); enum-typed columns carry
+  `V7__add_notification_preferences.sql`); enum-typed columns carry
   CHECK constraints that must be kept in sync with their `enums/` values (see
   V2/V3 for the pattern).
 - Databases created by Hibernate before Flyway was enabled were baselined at
@@ -114,6 +114,19 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 - Push payloads carry string data for deep linking: `type` (NotificationType),
   `screen` (`NotificationService.screenFor`), and context such as `partnerId`
   for `NEW_MESSAGE`. Android channel `recovertogether_default`, APNS sound on.
+- Delivery preferences live at `GET`/`PUT /notifications/preferences`
+  (`NotificationPreferenceController`): a global push switch, optional quiet
+  hours (`HH:mm`, evaluated on the user's local clock), and per-type push
+  toggles. A missing `notification_preferences` row means enabled, so new
+  types default on. Updates are patch-style (null keeps the current value,
+  blank quiet-hours time clears it); enabling quiet hours requires both times
+  and `start != end`.
+- Preferences only gate FCM push. In-app notifications and the SSE stream are
+  always delivered, so the inbox stays complete. Quiet hours support overnight
+  windows (start inclusive, end exclusive). `SOS_ALERT` bypasses the global
+  switch, per-type toggles and quiet hours, and cannot be disabled (400).
+- Preference lookup failures never block notification creation; push falls
+  back to the previous "deliver" behaviour and the in-app row is still saved.
 
 ## Realtime updates (SSE)
 
@@ -175,7 +188,8 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
   `CheckInReminderService`, `RandomCheckInReminderScheduler`,
   `MissedCheckInScheduler`, `Dashboard`, `Support`, `Device`, `UserTimeZone`,
   `RealtimeEventService` (SSE), `PushNotificationService`/`FcmPushService`,
-  `PasswordResetService`, `MailService`/`SmtpMailService`.
+  `NotificationPreferenceService`, `PasswordResetService`,
+  `MailService`/`SmtpMailService`.
 - `repository/` — Spring Data JPA repositories.
 - `entity/` — JPA entities (source of truth for the schema).
 - `dto/` — request/response DTOs.

@@ -5,6 +5,7 @@ import com.recovertogether.backend.entity.Notification;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.enums.NotificationType;
 import com.recovertogether.backend.repository.NotificationRepository;
+import com.recovertogether.backend.service.NotificationPreferenceService;
 import com.recovertogether.backend.service.NotificationService;
 import com.recovertogether.backend.service.PushNotificationService;
 import com.recovertogether.backend.service.RealtimeEventService;
@@ -39,13 +40,21 @@ class NotificationServiceTest {
     @Mock
     private RealtimeEventService realtimeEventService;
 
+    @Mock
+    private NotificationPreferenceService notificationPreferenceService;
+
     private NotificationService notificationService;
 
     private User currentUser;
 
     @BeforeEach
     void setUp() {
-        notificationService = new NotificationService(notificationRepository, pushNotificationService, realtimeEventService);
+        notificationService = new NotificationService(
+                notificationRepository,
+                pushNotificationService,
+                realtimeEventService,
+                notificationPreferenceService);
+        lenient().when(notificationPreferenceService.shouldPush(any(), any())).thenReturn(true);
 
         currentUser = new User();
         currentUser.setName("Alice");
@@ -161,6 +170,33 @@ class NotificationServiceTest {
                 notificationService.createNotification(currentUser, NotificationType.NEW_MESSAGE, "hello"));
 
         verify(notificationRepository).save(any(Notification.class));
+    }
+
+    @Test
+    @DisplayName("CREATE: push suppressed by preferences is still saved and streamed in-app")
+    void testCreateNotificationSkipsPushWhenSuppressed() {
+        when(notificationPreferenceService.shouldPush(currentUser, NotificationType.NEW_MESSAGE))
+                .thenReturn(false);
+
+        notificationService.createNotification(currentUser, NotificationType.NEW_MESSAGE, "quiet hours");
+
+        verify(notificationRepository).save(any(Notification.class));
+        verifyNoInteractions(pushNotificationService);
+        verify(realtimeEventService).publish(eq(1L), eq("notification"), any());
+    }
+
+    @Test
+    @DisplayName("CREATE: preference lookup failure does not block the workflow and falls back to pushing")
+    void testCreateNotificationSurvivesPreferenceFailure() {
+        when(notificationPreferenceService.shouldPush(any(), any()))
+                .thenThrow(new RuntimeException("preferences down"));
+
+        assertDoesNotThrow(() ->
+                notificationService.createNotification(currentUser, NotificationType.MISSED_CHECKIN, "hello"));
+
+        verify(notificationRepository).save(any(Notification.class));
+        verify(pushNotificationService).push(eq(currentUser), eq("Missed check-in"), eq("hello"), any());
+        verify(realtimeEventService).publish(eq(1L), eq("notification"), any());
     }
 
     @Test
