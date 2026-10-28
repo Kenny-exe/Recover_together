@@ -149,6 +149,19 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
   compose), `/health` → 200, and no `Hibernate:` lines in backend logs; then
   `docker compose down -v` to destroy the stack and its data volume.
 
+## API contract (mobile)
+
+- `docs/api-contract.md` is the frozen API surface for the mobile client:
+  hand-written conventions (auth/refresh flow, error envelope, pagination,
+  SSE/FCM semantics, local-day rules, enums) plus a generated endpoint
+  inventory and schema tables.
+- The generated region is refreshed with
+  `node docs/generate-api-contract.mjs <openapi.json>` after harvesting
+  `/v3/api-docs` from a dev boot; everything between the BEGIN/END GENERATED
+  markers is machine-written — change controllers/DTOs, never that region.
+- When an endpoint, DTO, or semantic changes, regenerate the doc in the same
+  commit so the mobile client can diff the contract.
+
 ## Password reset
 
 - Public endpoints: `POST /auth/forgot-password` (`email`) and
