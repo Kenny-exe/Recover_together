@@ -22,17 +22,20 @@ public class MessageService
     private final UserRepository userRepository;
     private final PartnerRequestRepository partnerRequestRepository;
     private final NotificationService notificationService;
+    private final RealtimeEventService realtimeEventService;
 
     public MessageService(
             MessageRepository messageRepository,
             UserRepository userRepository,
             PartnerRequestRepository partnerRequestRepository,
-            NotificationService notificationService)
+            NotificationService notificationService,
+            RealtimeEventService realtimeEventService)
     {
         this.messageRepository = messageRepository;
         this.userRepository = userRepository;
         this.partnerRequestRepository = partnerRequestRepository;
         this.notificationService=notificationService;
+        this.realtimeEventService=realtimeEventService;
     }
 
     public void sendMessage(Long receiverId, String content)
@@ -82,8 +85,23 @@ public class MessageService
 
         notificationService.createNotification(
                 receiver,
-                NotificationType.NEW_MESSAGE, sender.getName() + " sent you a message"
+                NotificationType.NEW_MESSAGE,
+                sender.getName() + " sent you a message",
+                java.util.Map.of(
+                        "partnerId", sender.getId().toString(),
+                        "partnerName", sender.getName()
+                )
         );
+
+        // Foreground live delivery for open chat screens.
+        try
+        {
+            realtimeEventService.publish(receiver.getId(), "message", new ChatMessageResponse(message));
+        }
+        catch (Exception e)
+        {
+            // Realtime delivery is best-effort; the message is already stored.
+        }
     }
     public List<ChatMessageResponse> getConversation(Long partnerId, int limit, Long beforeId)
     {

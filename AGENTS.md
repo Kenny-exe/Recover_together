@@ -18,6 +18,9 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
   `jdbc:postgresql://localhost:5432/recovertogether`.
 - Database credentials are provided through the local development environment
   and must not be committed to the repository.
+- `application.properties` resolves the datasource from `${DB_URL}`,
+  `${DB_USERNAME}`, `${DB_PASSWORD}` with local dev fallbacks; deployments
+  should inject these environment variables explicitly.
 - `jwt.secret=${JWT_SECRET}` is mandatory at runtime. The app will fail to
   start if `JWT_SECRET` is unset.
 - Tests override the JWT secret through
@@ -79,6 +82,24 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
   the service-account file.
 - Devices go stale on uninstall: sending returns `UNREGISTERED` and the device
   is deactivated automatically.
+- Push payloads carry string data for deep linking: `type` (NotificationType),
+  `screen` (`NotificationService.screenFor`), and context such as `partnerId`
+  for `NEW_MESSAGE`. Android channel `recovertogether_default`, APNS sound on.
+
+## Realtime updates (SSE)
+
+- `GET /events` (`text/event-stream`, JWT-authenticated) opens a foreground
+  stream per user; connections are tracked in `RealtimeEventService`.
+- Events: `connected` `{user}`, `message` (`ChatMessageResponse`), `notification`
+  (`NotificationResponse`). Chat sends also derive a `NEW_MESSAGE` notification.
+- Server heartbeats every 25s; emitters time out after 30 min so mobile
+  clients should reconnect with backoff. Delivery is best-effort and never
+  breaks the primary workflow.
+- Both SSE and FCM fire from `NotificationService.createNotification`; SSE
+  covers the foreground app, FCM covers backgrounded/killed apps.
+- `SecurityConfig` permits `ASYNC` and `ERROR` dispatcher types so the async
+  completion of the SSE stream is not re-authorized. `JwtAuthenticationFilter`
+  (a `OncePerRequestFilter`) skips ASYNC dispatches by default.
 
 ## Scheduling
 
@@ -95,7 +116,7 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 - `service/` — business logic including `User`, `Jwt`, `DailyCheckIn`,
   `PartnerRequest`, `PartnerCheckIn`, `Notification`, `Message`, `Achievement`,
   `MissedCheckInScheduler`, `Dashboard`, `Support`, `Device`,
-  `PushNotificationService`/`FcmPushService`.
+  `RealtimeEventService` (SSE), `PushNotificationService`/`FcmPushService`.
 - `repository/` — Spring Data JPA repositories.
 - `entity/` — JPA entities (source of truth for the schema).
 - `dto/` — request/response DTOs.

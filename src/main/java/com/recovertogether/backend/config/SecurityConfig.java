@@ -31,7 +31,10 @@ public class SecurityConfig
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth ->
-                        auth.requestMatchers(
+                        auth.dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ASYNC,
+                                        jakarta.servlet.DispatcherType.ERROR)
+                                .permitAll()
+                                .requestMatchers(
                                         "/auth/login",
                                         "/auth/refresh",
                                         "/users/register",

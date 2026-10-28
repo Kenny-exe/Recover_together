@@ -7,6 +7,7 @@ import com.recovertogether.backend.enums.NotificationType;
 import com.recovertogether.backend.repository.NotificationRepository;
 import com.recovertogether.backend.service.NotificationService;
 import com.recovertogether.backend.service.PushNotificationService;
+import com.recovertogether.backend.service.RealtimeEventService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,13 +36,16 @@ class NotificationServiceTest {
     @Mock
     private PushNotificationService pushNotificationService;
 
+    @Mock
+    private RealtimeEventService realtimeEventService;
+
     private NotificationService notificationService;
 
     private User currentUser;
 
     @BeforeEach
     void setUp() {
-        notificationService = new NotificationService(notificationRepository, pushNotificationService);
+        notificationService = new NotificationService(notificationRepository, pushNotificationService, realtimeEventService);
 
         currentUser = new User();
         currentUser.setName("Alice");
@@ -109,7 +113,7 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("CREATE: saves notification and fires a best-effort push with a mapped title")
+    @DisplayName("CREATE: saves notification, pushes mapped title + deep-link data, and emits SSE")
     void testCreateNotificationPushes() {
         notificationService.createNotification(currentUser, NotificationType.SOS_ALERT, "Alice triggered SOS");
 
@@ -118,14 +122,40 @@ class NotificationServiceTest {
         assertEquals(NotificationType.SOS_ALERT, captor.getValue().getType());
         assertSame(currentUser, captor.getValue().getReceiver());
 
-        verify(pushNotificationService).push(currentUser, "SOS alert", "Alice triggered SOS");
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Map<String, String>> dataCaptor =
+                ArgumentCaptor.forClass(java.util.Map.class);
+
+        verify(pushNotificationService).push(eq(currentUser), eq("SOS alert"), eq("Alice triggered SOS"),
+                dataCaptor.capture());
+        assertEquals("SOS_ALERT", dataCaptor.getValue().get("type"));
+        assertEquals("sos", dataCaptor.getValue().get("screen"));
+
+        verify(realtimeEventService).publish(eq(1L), eq("notification"), any());
     }
 
     @Test
-    @DisplayName("CREATE: push failure never breaks notification creation")
+    @DisplayName("CREATE: extra deep-link metadata (partnerId) is forwarded to the push payload")
+    void testCreateNotificationForwardsExtraData() {
+        notificationService.createNotification(currentUser, NotificationType.NEW_MESSAGE, "hi",
+                java.util.Map.of("partnerId", "2"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Map<String, String>> dataCaptor =
+                ArgumentCaptor.forClass(java.util.Map.class);
+
+        verify(pushNotificationService).push(eq(currentUser), eq("New message"), eq("hi"), dataCaptor.capture());
+        assertEquals("chat", dataCaptor.getValue().get("screen"));
+        assertEquals("2", dataCaptor.getValue().get("partnerId"));
+    }
+
+    @Test
+    @DisplayName("CREATE: push and SSE failures never break notification creation")
     void testCreateNotificationSurvivesPushFailure() {
         doThrow(new RuntimeException("firebase down"))
-                .when(pushNotificationService).push(any(), any(), any());
+                .when(pushNotificationService).push(any(), any(), any(), any());
+        doThrow(new RuntimeException("sse down"))
+                .when(realtimeEventService).publish(any(), any(), any());
 
         assertDoesNotThrow(() ->
                 notificationService.createNotification(currentUser, NotificationType.NEW_MESSAGE, "hello"));

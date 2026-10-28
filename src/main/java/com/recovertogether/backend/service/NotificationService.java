@@ -6,8 +6,7 @@ import com.recovertogether.backend.entity.Notification;
 import com.recovertogether.backend.entity.User;
 import com.recovertogether.backend.enums.NotificationType;
 import com.recovertogether.backend.repository.NotificationRepository;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,12 +17,15 @@ public class NotificationService
 {
     private final NotificationRepository notificationRepository;
     private final PushNotificationService pushNotificationService;
+    private final RealtimeEventService realtimeEventService;
 
     public NotificationService(NotificationRepository notificationRepository,
-                               PushNotificationService pushNotificationService)
+                               PushNotificationService pushNotificationService,
+                               RealtimeEventService realtimeEventService)
     {
         this.notificationRepository = notificationRepository;
         this.pushNotificationService = pushNotificationService;
+        this.realtimeEventService = realtimeEventService;
     }
 
     private static final int MAX_LIMIT = 100;
@@ -79,6 +81,12 @@ public class NotificationService
 
     public void createNotification(User receiver, NotificationType type, String message)
     {
+        createNotification(receiver, type, message, java.util.Map.of());
+    }
+
+    public void createNotification(User receiver, NotificationType type, String message,
+                                   java.util.Map<String, String> extraData)
+    {
         Notification notification=new Notification();
 
         notification.setReceiver(receiver);
@@ -86,16 +94,56 @@ public class NotificationService
         notification.setMessage(message);
         notificationRepository.save(notification);
 
+        java.util.Map<String, String> data = new java.util.HashMap<>();
+        if (type != null)
+        {
+            data.put("type", type.name());
+        }
+        data.put("screen", screenFor(type));
+        if (extraData != null)
+        {
+            data.putAll(extraData);
+        }
+
         // Best-effort push to the receiver's registered devices; the push
         // service swallows all failures so this never blocks the workflow.
         try
         {
-            pushNotificationService.push(receiver, titleFor(type), message);
+            pushNotificationService.push(receiver, titleFor(type), message, data);
         }
         catch (Exception e)
         {
             // Never break the caller's transaction because of push.
         }
+
+        // Foreground live update for the mobile SSE stream.
+        try
+        {
+            realtimeEventService.publish(receiver.getId(), "notification", new NotificationResponse(notification));
+        }
+        catch (Exception e)
+        {
+            // Realtime delivery is best-effort as well.
+        }
+    }
+
+    /** Mobile screen route shipped in the push payload for tap navigation. */
+    public static String screenFor(NotificationType type)
+    {
+        if (type == null)
+        {
+            return "home";
+        }
+        return switch (type)
+        {
+            case NEW_MESSAGE -> "chat";
+            case SOS_ALERT -> "sos";
+            case PARTNER_RELAPSE -> "partner";
+            case MISSED_CHECKIN -> "checkin";
+            case ACHIEVEMENT_UNLOCKED, PARTNER_ACHIEVEMENT -> "achievements";
+            case DAILY_CHECKIN_REMINDER -> "checkin";
+            case SUPPORT_REQUEST -> "support";
+        };
     }
 
     public static String titleFor(NotificationType type)
