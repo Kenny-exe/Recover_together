@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +18,21 @@ import java.util.Date;
 public class JwtService {
 
     private static final Logger logger = LoggerFactory.getLogger(JwtService.class);
+
+    /**
+     * HMAC-SHA256 needs at least 256 bits (32 bytes) of key material; shorter
+     * secrets are brute-forceable. Validated at startup so a weak or missing
+     * secret fails the boot instead of quietly signing tokens with a weak key.
+     */
+    @PostConstruct
+    public void validateSecret() {
+        int secretBytes = secret == null ? 0 : secret.getBytes(StandardCharsets.UTF_8).length;
+        if (secretBytes < 32) {
+            throw new IllegalStateException(
+                    "jwt.secret must be at least 32 bytes (256 bits) for HMAC-SHA256; "
+                            + "set JWT_SECRET to a strong random value");
+        }
+    }
 
     public enum TokenValidationResult {
         VALID,

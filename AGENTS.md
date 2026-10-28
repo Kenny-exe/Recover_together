@@ -81,6 +81,42 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
   refresh token. Password change invalidates prior tokens and revokes refresh
   tokens of the user.
 
+## Production hardening
+
+- IP rate limiting: `RateLimitFilter` throttles the public auth endpoints
+  (`/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password`,
+  `/users/register`) per client IP + path in a fixed 60-second window. Defaults:
+  enabled, 30 requests/minute (`RATE_LIMIT_ENABLED`, `RATE_LIMIT_PER_MINUTE`);
+  over the limit returns 429 with the standard `{timestamp,status,message}` body
+  plus a `Retry-After` header, before any auth work runs. The filter is declared
+  as an `@Bean` in `SecurityConfig` whose servlet auto-registration is disabled
+  (via `FilterRegistrationBean`) so it runs exactly once, from the security
+  chain, before `JwtAuthenticationFilter`. The per-account login lockout
+  (5 → 15 min) is independent and still applies.
+- `RATE_LIMIT_TRUST_PROXY=true` trusts `X-Forwarded-For` (leftmost entry) as the
+  client IP for the rate-limit key; enable only behind a proxy that sets the
+  header, otherwise the IP is spoofable and limits can be bypassed. Default:
+  use `getRemoteAddr()`.
+- CORS is opt-in and default-closed: `CORS_ALLOWED_ORIGINS` (comma-separated)
+  feeds a `CorsConfigurationSource` wired through `.cors(withDefaults())`. With
+  nothing configured every cross-origin request is rejected; mobile apps need
+  no CORS, web clients opt in by listing origins. Allowed methods:
+  GET/POST/PUT/DELETE/OPTIONS; headers: Authorization/Content-Type/Accept.
+- JWT secret strength is validated at startup
+  (`JwtService.validateSecret`): a secret shorter than 32 bytes (256 bits,
+  the HMAC-SHA256 key size) fails the boot with a message pointing at
+  `JWT_SECRET`. A missing `JWT_SECRET` already fails placeholder resolution.
+- API docs are gated by one variable: `DOCS_ENABLED=false`
+  (`app.docs.enabled`, default true) drives
+  `springdoc.api-docs.enabled` / `springdoc.swagger-ui.enabled`, so production
+  turns `/v3/api-docs` and `/swagger-ui/**` into 404s without code changes.
+  Because `src/test/resources/application.properties` fully shadows the main
+  file, its springdoc alias lines must be kept in sync when adding aliases.
+- Security headers come from Spring Security defaults (X-Frame-Options DENY,
+  nosniff, no-store cache directives) plus
+  `server.error.include-message=always` — no custom header config was added,
+  by design; keep it lean.
+
 ## Password reset
 
 - Public endpoints: `POST /auth/forgot-password` (`email`) and
@@ -216,7 +252,7 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 - `repository/` — Spring Data JPA repositories.
 - `entity/` — JPA entities (source of truth for the schema).
 - `dto/` — request/response DTOs.
-- `security/` — `JwtAuthenticationFilter`.
+- `security/` — `JwtAuthenticationFilter`, `RateLimitFilter`.
 - `config/` — `SecurityConfig`; `exception/` — `GlobalExceptionHandler`;
   `enums/` — domain enums.
 
