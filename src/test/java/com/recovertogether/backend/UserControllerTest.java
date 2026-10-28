@@ -1,6 +1,7 @@
 package com.recovertogether.backend;
 
 import com.recovertogether.backend.controller.UserController;
+import com.recovertogether.backend.dto.DeleteAccountRequest;
 import com.recovertogether.backend.dto.UserResponse;
 import com.recovertogether.backend.dto.UpdateProfileRequest;
 import com.recovertogether.backend.entity.User;
@@ -90,11 +91,12 @@ class UserControllerTest {
     void testDeleteOtherUserForbidden() {
         ResponseStatusException ex = assertThrows(
                 ResponseStatusException.class,
-                () -> userController.deleteUser(2L)
+                () -> userController.deleteUser(2L, new DeleteAccountRequest("Password123!"))
         );
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         assertEquals("You cannot delete another user's account", ex.getReason());
+        verify(userService, never()).verifyPasswordForAccountDeletion(any(), any());
         verify(userRepository, never()).delete(any());
     }
 
@@ -134,14 +136,32 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /users/{id} on own account successfully deletes user")
+    @DisplayName("DELETE /users/{id} on own account successfully deletes user after re-authentication")
     void testDeleteOwnAccountSuccess() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
 
-        String result = userController.deleteUser(1L);
+        String result = userController.deleteUser(1L, new DeleteAccountRequest("Password123!"));
 
         assertEquals("User deleted successfully", result);
+        verify(userService).verifyPasswordForAccountDeletion(currentUser, "Password123!");
         verify(userRepository).delete(currentUser);
+    }
+
+    @Test
+    @DisplayName("DELETE /users/me does not delete the account when re-authentication fails")
+    void testDeleteMeWrongPassword() {
+        doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password does not match"))
+                .when(userService).verifyPasswordForAccountDeletion(currentUser, "WrongPassword!");
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> userController.deleteCurrentUser(new DeleteAccountRequest("WrongPassword!"))
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Password does not match", ex.getReason());
+        verify(userRepository, never()).delete(any());
+        verify(auditLogService, never()).log(any(), any(), any(), any());
     }
 
     @Test
@@ -316,11 +336,12 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /users/me deletes the current account and returns JSON message")
+    @DisplayName("DELETE /users/me deletes the current account after re-authentication and returns JSON message")
     void testDeleteMe() {
-        Map<String, String> result = userController.deleteCurrentUser();
+        Map<String, String> result = userController.deleteCurrentUser(new DeleteAccountRequest("Password123!"));
 
         assertEquals("Account deleted successfully", result.get("message"));
+        verify(userService).verifyPasswordForAccountDeletion(currentUser, "Password123!");
         verify(userRepository).delete(currentUser);
         verify(auditLogService).log(any(), eq(1L), eq("alice@example.com"), any());
     }

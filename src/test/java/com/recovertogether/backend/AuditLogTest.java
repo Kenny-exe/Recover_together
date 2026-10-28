@@ -1,6 +1,7 @@
 package com.recovertogether.backend;
 
 import com.recovertogether.backend.controller.UserController;
+import com.recovertogether.backend.dto.DeleteAccountRequest;
 import com.recovertogether.backend.dto.SupportRequestResponse;
 import com.recovertogether.backend.entity.*;
 import com.recovertogether.backend.enums.AuditAction;
@@ -221,8 +222,9 @@ class AuditLogTest {
     @DisplayName("5. Account deletion creates ACCOUNT_DELETED audit log")
     void testAccountDeletionAudit() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(alice));
+        when(passwordEncoder.matches("Password123!", "encoded_secret")).thenReturn(true);
 
-        String result = userController.deleteUser(1L);
+        String result = userController.deleteUser(1L, new DeleteAccountRequest("Password123!"));
 
         assertEquals("User deleted successfully", result);
         verify(userRepository).delete(alice);

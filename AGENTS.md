@@ -34,7 +34,7 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 - `spring.jpa.hibernate.ddl-auto=validate` — Hibernate validates entity mappings against the database schema at startup without performing automatic DDL changes.
 - The PostgreSQL database must be reachable for migrations and schema validation.
 - Entity changes require a new migration (current head:
-  `V7__add_notification_preferences.sql`); enum-typed columns carry
+  `V8__add_account_deletion_denied_audit.sql`); enum-typed columns carry
   CHECK constraints that must be kept in sync with their `enums/` values (see
   V2/V3 for the pattern).
 - Databases created by Hibernate before Flyway was enabled were baselined at
@@ -57,8 +57,13 @@ Tests are `@SpringBootTest` and boot the real context — they are **not** isola
 - User discovery is exact-email search only (`GET /users/search?email=`); there
   is no directory dump endpoint.
 - Account deletion is self-service: `DELETE /users/me` (or `DELETE /users/{id}`
-  on own id). DB-level `ON DELETE CASCADE` removes the user's owned rows;
-  audit logs are retained intentionally.
+  on own id). Both require a JSON body with the caller's current `password`
+  (`DeleteAccountRequest`); deletion is irreversible, so a valid access token
+  alone is not enough. Wrong passwords return 400 and are audited as
+  `ACCOUNT_DELETION_DENIED`; deletion shares the login lockout counters
+  (5 failures → 15 min, locked accounts get 429). DB-level
+  `ON DELETE CASCADE` removes the user's owned rows; audit logs are retained
+  intentionally.
 
 ## Auth
 

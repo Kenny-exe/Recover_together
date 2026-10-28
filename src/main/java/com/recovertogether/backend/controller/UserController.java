@@ -5,6 +5,7 @@ import com.recovertogether.backend.repository.UserRepository;
 import com.recovertogether.backend.dto.RegisterRequest;
 import com.recovertogether.backend.dto.UserResponse;
 import com.recovertogether.backend.dto.ChangePasswordRequest;
+import com.recovertogether.backend.dto.DeleteAccountRequest;
 import com.recovertogether.backend.dto.UpdateProfileRequest;
 import java.util.Map;
 import com.recovertogether.backend.service.UserService;
@@ -70,7 +71,7 @@ public class UserController
 
     //DELETE
     @DeleteMapping("/{id}")
-    public String deleteUser(@PathVariable Long id)
+    public String deleteUser(@PathVariable Long id, @Valid @RequestBody DeleteAccountRequest request)
     {
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (!currentUser.getId().equals(id))
@@ -80,15 +81,17 @@ public class UserController
 
         User user = userRepository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        userService.verifyPasswordForAccountDeletion(user, request.getPassword());
         removeAccount(user);
         return "User deleted successfully";
     }
 
     //SELF-SERVICE DELETE (mobile account-deletion flow)
     @DeleteMapping("/me")
-    public Map<String, String> deleteCurrentUser()
+    public Map<String, String> deleteCurrentUser(@Valid @RequestBody DeleteAccountRequest request)
     {
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        userService.verifyPasswordForAccountDeletion(currentUser, request.getPassword());
         removeAccount(currentUser);
         return Map.of("message", "Account deleted successfully");
     }

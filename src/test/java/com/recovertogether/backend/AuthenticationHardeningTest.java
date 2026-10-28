@@ -436,7 +436,90 @@ class AuthenticationHardeningTest {
     }
 
     // =========================================================================
-    // 5. BRUTE FORCE PROTECTION TESTS
+    // 5. ACCOUNT DELETION RE-AUTHENTICATION TESTS
+    // =========================================================================
+
+    @Test
+    @DisplayName("Deletion Re-auth 1: Correct password allows deletion without touching failure counters")
+    void testDeletionReauthSuccess() {
+        assertDoesNotThrow(() -> userService.verifyPasswordForAccountDeletion(alice, "Password123!"));
+
+        assertEquals(0, alice.getFailedLoginAttempts());
+        assertNull(alice.getLockoutUntil());
+        verify(userRepository, never()).save(any());
+        verify(auditLogRepository, never())
+                .save(argThat(log -> log.getAction() == AuditAction.ACCOUNT_DELETION_DENIED));
+    }
+
+    @Test
+    @DisplayName("Deletion Re-auth 2: Wrong password throws 400, increments attempts, and audits the denial")
+    void testDeletionReauthWrongPassword() {
+        alice.setFailedLoginAttempts(2);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> userService.verifyPasswordForAccountDeletion(alice, "WrongPassword!"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Password does not match", ex.getReason());
+        assertEquals(3, alice.getFailedLoginAttempts());
+        assertNull(alice.getLockoutUntil());
+        verify(userRepository).save(alice);
+        verify(auditLogRepository).save(argThat(log ->
+                log.getAction() == AuditAction.ACCOUNT_DELETION_DENIED));
+    }
+
+    @Test
+    @DisplayName("Deletion Re-auth 3: 5th wrong password locks the account for 15 minutes")
+    void testDeletionReauthFifthFailureLocksAccount() {
+        alice.setFailedLoginAttempts(4);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> userService.verifyPasswordForAccountDeletion(alice, "WrongPassword!"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals(5, alice.getFailedLoginAttempts());
+        assertNotNull(alice.getLockoutUntil());
+        assertTrue(alice.getLockoutUntil().isAfter(LocalDateTime.now().plusMinutes(14)));
+        verify(userRepository).save(alice);
+        verify(auditLogRepository).save(argThat(log -> log.getAction() == AuditAction.ACCOUNT_LOCKED));
+        verify(auditLogRepository).save(argThat(log ->
+                log.getAction() == AuditAction.ACCOUNT_DELETION_DENIED));
+    }
+
+    @Test
+    @DisplayName("Deletion Re-auth 4: Locked account returns 429 and skips BCrypt matching")
+    void testDeletionReauthLockedAccount() {
+        PasswordEncoder spyEncoder = spy(passwordEncoder);
+        UserService testUserService = new UserService(userRepository, spyEncoder, auditLogService, refreshTokenService);
+
+        alice.setFailedLoginAttempts(5);
+        alice.setLockoutUntil(LocalDateTime.now().plusMinutes(10));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> testUserService.verifyPasswordForAccountDeletion(alice, "Password123!"));
+
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getStatusCode());
+        assertEquals("Too many failed attempts. Try again later.", ex.getReason());
+        verify(spyEncoder, never()).matches(any(), any());
+        verify(auditLogRepository).save(argThat(log ->
+                log.getAction() == AuditAction.ACCOUNT_DELETION_DENIED));
+    }
+
+    @Test
+    @DisplayName("Deletion Re-auth 5: Expired lockout is cleared before re-authentication")
+    void testDeletionReauthExpiredLockout() {
+        alice.setFailedLoginAttempts(5);
+        alice.setLockoutUntil(LocalDateTime.now().minusMinutes(1));
+
+        assertDoesNotThrow(() -> userService.verifyPasswordForAccountDeletion(alice, "Password123!"));
+
+        assertEquals(0, alice.getFailedLoginAttempts());
+        assertNull(alice.getLockoutUntil());
+        verify(userRepository).save(alice);
+    }
+
+    // =========================================================================
+    // 6. BRUTE FORCE PROTECTION TESTS
     // =========================================================================
 
     @Test
@@ -524,7 +607,7 @@ class AuthenticationHardeningTest {
     }
 
     // =========================================================================
-    // 6. AUDIT RESILIENCE TESTS
+    // 7. AUDIT RESILIENCE TESTS
     // =========================================================================
 
     @Test

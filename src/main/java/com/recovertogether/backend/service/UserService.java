@@ -158,4 +158,54 @@ public class UserService {
 
         auditLogService.log(AuditAction.PASSWORD_CHANGED, currentUser.getId(), currentUser.getEmail(), null);
     }
+
+    /**
+     * Re-authenticates the caller before an irreversible account deletion.
+     *
+     * <p>Deletion shares the login lockout counters: five wrong passwords lock
+     * the account for 15 minutes, and a locked account cannot attempt a
+     * deletion at all. Every denial is audited as
+     * {@link AuditAction#ACCOUNT_DELETION_DENIED}.
+     */
+    public void verifyPasswordForAccountDeletion(User currentUser, String password) {
+        LocalDateTime now = LocalDateTime.now();
+
+        if (currentUser.getLockoutUntil() != null && currentUser.getLockoutUntil().isAfter(now)) {
+            auditLogService.log(AuditAction.ACCOUNT_DELETION_DENIED, currentUser.getId(),
+                    currentUser.getEmail(), "Account locked");
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many failed attempts. Try again later.");
+        }
+
+        boolean lockoutExpired = currentUser.getLockoutUntil() != null;
+        if (lockoutExpired) {
+            currentUser.setLockoutUntil(null);
+            currentUser.setFailedLoginAttempts(0);
+        }
+
+        if (!passwordEncoder.matches(password, currentUser.getPassword())) {
+            int attempts = currentUser.getFailedLoginAttempts() + 1;
+            currentUser.setFailedLoginAttempts(attempts);
+
+            if (attempts >= MAX_FAILED_ATTEMPTS) {
+                currentUser.setLockoutUntil(now.plusMinutes(LOCKOUT_MINUTES));
+                userRepository.save(currentUser);
+                auditLogService.log(AuditAction.ACCOUNT_LOCKED, currentUser.getId(), currentUser.getEmail(),
+                        "Account locked after " + attempts + " failed attempts");
+            } else {
+                userRepository.save(currentUser);
+            }
+
+            auditLogService.log(AuditAction.ACCOUNT_DELETION_DENIED, currentUser.getId(),
+                    currentUser.getEmail(), "Invalid password");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password does not match");
+        }
+
+        // Successful re-authentication clears any stale failure state.
+        if (currentUser.getFailedLoginAttempts() != 0 || lockoutExpired) {
+            currentUser.setFailedLoginAttempts(0);
+            currentUser.setLockoutUntil(null);
+            userRepository.save(currentUser);
+        }
+    }
 }

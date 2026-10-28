@@ -36,6 +36,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -46,6 +47,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -242,7 +244,9 @@ class AccountDeletionIntegrationTest {
         Long userId = user.getId();
 
         mockMvc.perform(delete("/users/me")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"Password123!\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Account deleted successfully"));
 
@@ -278,6 +282,97 @@ class AccountDeletionIntegrationTest {
         assertEquals(1, count(
                 "SELECT COUNT(*) FROM audit_logs WHERE user_id = ? AND action = 'ACCOUNT_DELETED'", userId),
                 "account deletion must be audited after the user row is gone");
+    }
+
+    @Test
+    @DisplayName("DELETE /users/me without a request body returns 400 and keeps the account")
+    void testDeletionRequiresPasswordBody() throws Exception {
+        Long userId = user.getId();
+
+        mockMvc.perform(delete("/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isBadRequest());
+
+        assertTrue(userRepository.findById(userId).isPresent(), "account must survive a bodyless deletion attempt");
+    }
+
+    @Test
+    @DisplayName("DELETE /users/me with a blank password returns 400 and keeps the account")
+    void testDeletionRejectsBlankPassword() throws Exception {
+        Long userId = user.getId();
+
+        mockMvc.perform(delete("/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Password is required"));
+
+        assertTrue(userRepository.findById(userId).isPresent(), "account must survive a blank-password deletion attempt");
+    }
+
+    @Test
+    @DisplayName("DELETE /users/me with a wrong password returns 400, audits the denial, and keeps the account")
+    void testDeletionRejectsWrongPassword() throws Exception {
+        Long userId = user.getId();
+
+        mockMvc.perform(delete("/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"WrongPassword!\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Password does not match"));
+
+        assertTrue(userRepository.findById(userId).isPresent(), "account must survive a failed re-authentication");
+        assertEquals(1, count("SELECT failed_login_attempts FROM users WHERE id = ?", userId));
+        assertEquals(1, count(
+                "SELECT COUNT(*) FROM audit_logs WHERE user_id = ? AND action = 'ACCOUNT_DELETION_DENIED'", userId));
+    }
+
+    @Test
+    @DisplayName("DELETE /users/me locks the account after five wrong passwords and then rejects with 429")
+    void testDeletionLocksAccountAfterRepeatedFailures() throws Exception {
+        Long userId = user.getId();
+
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            mockMvc.perform(delete("/users/me")
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"password\":\"WrongPassword!\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        assertEquals(5, count("SELECT failed_login_attempts FROM users WHERE id = ?", userId));
+        assertNotNull(jdbcTemplate.queryForObject(
+                "SELECT lockout_until FROM users WHERE id = ?", LocalDateTime.class, userId));
+        assertEquals(5, count(
+                "SELECT COUNT(*) FROM audit_logs WHERE user_id = ? AND action = 'ACCOUNT_DELETION_DENIED'", userId));
+        assertEquals(1, count(
+                "SELECT COUNT(*) FROM audit_logs WHERE user_id = ? AND action = 'ACCOUNT_LOCKED'", userId));
+
+        // Even the correct password cannot delete a locked account.
+        mockMvc.perform(delete("/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"Password123!\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value("Too many failed attempts. Try again later."));
+
+        assertTrue(userRepository.findById(userId).isPresent(), "locked account must not be deleted");
+    }
+
+    @Test
+    @DisplayName("DELETE /users/{id} on the caller's own id also requires the current password")
+    void testDeleteByOwnIdRequiresPassword() throws Exception {
+        Long userId = user.getId();
+
+        mockMvc.perform(delete("/users/" + userId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"Password123!\"}"))
+                .andExpect(status().isOk());
+
+        assertTrue(userRepository.findById(userId).isEmpty(), "user row must be deleted");
     }
 
     private int count(String sql, Object... args) {
